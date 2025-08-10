@@ -39,6 +39,19 @@
         </div>
         {% endif %}
 
+         {% if story_obj.background_description %}
+        <div class="card shadow-lg mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Background Description</h4>
+            </div>
+            <div class="card-body">
+                <div class="background-description">
+                    {{ story_obj.background_description|linebreaksbr }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card shadow-lg">
             <div class="card-header bg-secondary text-white">
                 <h4 class="mb-0">Story Details</h4>

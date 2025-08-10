@@ -1,4 +1,4 @@
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import logging
@@ -7,10 +7,9 @@ logger = logging.getLogger(__name__)
 
 class StoryGeneratorService:
     def __init__(self):
-        # Using Ollama with a free local model (llama2)
         # You can also use other free options like HuggingFace transformers
         try:
-            self.llm = Ollama(model="llama2")
+            self.llm = OllamaLLM(model="gemma:2b")
         except Exception as e:
             logger.error(f"Failed to initialize Ollama: {e}")
             # Fallback to a simple mock generator for demonstration
@@ -20,9 +19,9 @@ class StoryGeneratorService:
         """Generate a short story based on the given prompt"""
         
         length_instructions = {
-            'short': 'Write a short story of about 200-300 words.',
-            'medium': 'Write a medium-length story of about 400-500 words.',
-            'long': 'Write a longer story of about 600-800 words.'
+            'short': 'Write a short story of about 50-100 words.',
+            'medium': 'Write a medium-length story of about 100-200 words.',
+            'long': 'Write a longer story of about 200-250 words.'
         }
         
         story_template = PromptTemplate(
@@ -75,7 +74,7 @@ class StoryGeneratorService:
             Provide a brief character description of the main protagonist including:
             - Physical appearance
             - Personality traits
-            - Key motivations
+            - Key motivations   
             
             Character Description:
             """
@@ -93,6 +92,33 @@ class StoryGeneratorService:
             logger.error(f"Error generating character description: {e}")
             return "A brave and curious protagonist who faces challenges with determination and grows throughout their journey."
     
+    def generate_background_description(self, story):
+        """Extract and describe the main character from the story"""
+        
+        character_template = PromptTemplate(
+            input_variables=["story"],
+            template="""
+            Based on this story: {story}
+            
+            Provide a brief background description of the setting in the story.
+            
+            Background Description:
+            """
+        )
+        
+        if self.llm is None:
+            return "A bright and happening city where everyone is continuously busy."
+        
+        try:
+            chain = character_template | self.llm | StrOutputParser()
+            description = chain.invoke({"story": story})
+            return description.strip()
+            
+        except Exception as e:
+            logger.error(f"Error generating character description: {e}")
+            return "A brave and curious protagonist who faces challenges with determination and grows throughout their journey."
+    
+
     def _generate_mock_story(self, prompt, genre):
         """Fallback mock story generator"""
         return f"""
@@ -120,26 +146,3 @@ class StoryGeneratorService:
 
         When she finally returned home hours later, the oak tree was gone, but Sarah carried with her the knowledge that magic existed everywhere, waiting for those brave enough to seek it.
         """
-
-# Alternative free implementation using HuggingFace (uncomment to use)
-"""
-from transformers import pipeline
-
-class HuggingFaceStoryGenerator:
-    def __init__(self):
-        self.generator = pipeline('text-generation', model='gpt2')
-    
-    def generate_story(self, prompt, length='medium', genre='fantasy'):
-        max_length = {'short': 200, 'medium': 400, 'long': 600}[length]
-        
-        full_prompt = f"Write a {genre} story: {prompt}"
-        
-        result = self.generator(
-            full_prompt,
-            max_length=max_length,
-            num_return_sequences=1,
-            temperature=0.7
-        )
-        
-        return result[0]['generated_text']
-"""

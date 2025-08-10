@@ -1,3 +1,6 @@
 Django==4.2.7
 python-decouple==3.8
 requests==2.31.0
+langchain-community==0.3.27
+langchain-core==0.3.74
+langsmith==0.4.13

@@ -39,12 +39,14 @@ def generate_story(request):
             
             # Generate character description
             character_description = story_service.generate_character_description(story)
+            background_description = story_service.generate_background_description(story)
             
             # Save to database
             story_obj = StoryGeneration.objects.create(
                 prompt=prompt,
                 generated_story=story,
-                character_description=character_description
+                character_description=character_description,
+                background_description=background_description
             )
             
             messages.success(request, 'Story generated successfully!')

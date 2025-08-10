@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Story Generator{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card shadow-lg">
+            <div class="card-header bg-primary text-white">
+                <h2 class="card-title mb-0">
+                    <i class="fas fa-magic"></i> Generate Your Story
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'generate_story' %}" id="story-form">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        {{ form.prompt.label_tag }}
+                        {{ form.prompt }}
+                        <div class="form-text">{{ form.prompt.help_text }}</div>
+                        {% if form.prompt.errors %}
+                            <div class="text-danger">
+                                {% for error in form.prompt.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            {{ form.story_length.label_tag }}
+                            {{ form.story_length }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.genre.label_tag }}
+                            {{ form.genre }}
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg w-100" id="generate-btn">
+                        <i class="fas fa-sparkles"></i> Generate Story
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if recent_stories %}
+<div class="row mt-5">
+    <div class="col-lg-8 mx-auto">
+        <h3>Recent Stories</h3>
+        <div class="list-group">
+            {% for story in recent_stories %}
+            <a href="{% url 'story_detail' story.id %}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">{{ story.prompt|truncatechars:80 }}</h6>
+                    <small>{{ story.created_at|timesince }} ago</small>
+                </div>
+                <p class="mb-1">{{ story.generated_story|truncatechars:150 }}</p>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mt-5">
+    <div class="col-lg-8 mx-auto">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5>How it works:</h5>
+                <ul>
+                    <li>Enter a creative prompt describing your story idea</li>
+                    <li>Choose your preferred story length and genre</li>
+                    <li>Click generate and let AI create your unique story</li>
+                    <li>Get both the story and character descriptions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

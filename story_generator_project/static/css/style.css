@@ -1,0 +1,108 @@
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+    padding: 1.5rem;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.btn {
+    border-radius: 10px;
+    padding: 0.7rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.story-content {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    text-align: justify;
+}
+
+.character-description {
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.form-control, .form-select {
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    padding: 0.75rem 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.list-group-item {
+    border-radius: 10px !important;
+    margin-bottom: 0.5rem;
+    border: 1px solid #dee2e6;
+}
+
+footer {
+    margin-top: auto;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+    
+    .story-content {
+        font-size: 1rem;
+    }
+}
+
+/* Loading animation */
+.btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn.loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

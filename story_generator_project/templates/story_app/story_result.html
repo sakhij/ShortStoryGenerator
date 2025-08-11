@@ -12,6 +12,7 @@
             </a>
         </div>
 
+        <!-- Story Content -->
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-success text-white">
                 <h4 class="mb-0">Story</h4>
@@ -20,38 +21,35 @@
                 {% endif %}
             </div>
             <div class="card-body">
-                <div class="story-content">
-                    {{ story_obj.generated_story|linebreaksbr }}
-                </div>
+                {{ story_obj.generated_story|linebreaksbr }}
             </div>
         </div>
 
+        <!-- Character Description -->
         {% if story_obj.character_description %}
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-info text-white">
                 <h4 class="mb-0">Main Character</h4>
             </div>
             <div class="card-body">
-                <div class="character-description">
-                    {{ story_obj.character_description|linebreaksbr }}
-                </div>
+                {{ story_obj.character_description|linebreaksbr }}
             </div>
         </div>
         {% endif %}
 
-         {% if story_obj.background_description %}
+        <!-- Background Description -->
+        {% if story_obj.background_description %}
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-warning text-white">
                 <h4 class="mb-0">Background Description</h4>
             </div>
             <div class="card-body">
-                <div class="background-description">
-                    {{ story_obj.background_description|linebreaksbr }}
-                </div>
+                {{ story_obj.background_description|linebreaksbr }}
             </div>
         </div>
         {% endif %}
 
+        <!-- Story Details -->
         <div class="card shadow-lg">
             <div class="card-header bg-secondary text-white">
                 <h4 class="mb-0">Story Details</h4>

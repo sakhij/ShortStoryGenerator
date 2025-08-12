@@ -7,7 +7,9 @@ import re
 import requests
 import base64
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
+import cv2
+import numpy as np
 import time
 import os
 
@@ -44,6 +46,10 @@ class StoryGeneratorService:
         
         # Extract visual style consistency parameters from genre
         visual_style = self._get_visual_style_for_genre(genre)
+
+        # Generate character and background images separately
+        character_image_result = None
+        background_image_result = None
         
         # Then generate character image based on character description
         if story_package['character_description']:
@@ -78,7 +84,369 @@ class StoryGeneratorService:
         else:
             story_package['background_image'] = self._generate_placeholder_image("background")
         
+        # NEW: Combine character and background into a cohesive scene
+        if (character_image_result and character_image_result.get('success') and 
+            background_image_result and background_image_result.get('success')):
+            try:
+                logger.info("Combining images into cohesive scene...")
+                combined_image_result = self.combine_images_into_scene(
+                    character_image_result['image_data'],
+                    background_image_result['image_data'],
+                    story_package['character_description'],
+                    story_package['background_description'],
+                    genre
+                )
+                story_package['combined_scene'] = combined_image_result
+            except Exception as e:
+                logger.error(f"Failed to combine images: {e}")
+                story_package['combined_scene'] = self._generate_placeholder_image("combined_scene")
+        else:
+            story_package['combined_scene'] = self._generate_placeholder_image("combined_scene")
+        
         return story_package
+    
+    def combine_images_into_scene(self, character_b64, background_b64, character_desc, background_desc, genre):
+        """
+        Combine character and background images into a coherent scene using PIL and OpenCV
+        NEW METHOD - Core image combination functionality
+        """
+        try:
+            # Decode base64 images
+            char_img = self._decode_base64_image(character_b64)
+            bg_img = self._decode_base64_image(background_b64)
+            
+            if char_img is None or bg_img is None:
+                raise ValueError("Failed to decode input images")
+            
+            # Step 1: Analyze and match style/lighting
+            char_img, bg_img = self._match_image_styles(char_img, bg_img, genre)
+            
+            # Step 2: Determine optimal positioning based on descriptions
+            position_info = self._analyze_positioning(character_desc, background_desc)
+            
+            # Step 3: Prepare character (remove background, adjust size)
+            char_img_prepared = self._prepare_character_for_composition(char_img, position_info)
+            
+            # Step 4: Prepare background (adjust for character placement)
+            bg_img_prepared = self._prepare_background_for_composition(bg_img, position_info)
+            
+            # Step 5: Composite the final scene
+            combined_image = self._composite_final_scene(char_img_prepared, bg_img_prepared, position_info)
+            
+            # Step 6: Apply final post-processing
+            final_image = self._apply_scene_post_processing(combined_image, genre)
+            
+            # Convert to base64 for storage
+            combined_b64 = self._encode_image_to_base64(final_image)
+            
+            return {
+                'image_data': combined_b64,
+                'prompt': f"Combined scene: character in {genre} setting",
+                'model_used': 'PIL+OpenCV_compositor',
+                'success': True,
+                'type': 'combined_scene',
+                'composition_info': position_info
+            }
+            
+        except Exception as e:
+            logger.error(f"Error combining images: {e}")
+            return self._generate_placeholder_image("combined_scene")
+    
+    def _decode_base64_image(self, base64_str):
+        """Convert base64 string to PIL Image"""
+        try:
+            img_data = base64.b64decode(base64_str)
+            img = Image.open(BytesIO(img_data)).convert('RGBA')
+            return img
+        except Exception as e:
+            logger.error(f"Failed to decode base64 image: {e}")
+            return None
+    
+    def _encode_image_to_base64(self, pil_image):
+        """Convert PIL Image to base64 string"""
+        try:
+            buffered = BytesIO()
+            pil_image.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+            return img_base64
+        except Exception as e:
+            logger.error(f"Failed to encode image to base64: {e}")
+            return None
+    
+    def _match_image_styles(self, char_img, bg_img, genre):
+        """
+        Match lighting, color temperature, and contrast between character and background
+        Uses PIL for color/lighting adjustments
+        """
+        try:
+            # Convert to numpy for analysis
+            char_array = np.array(char_img.convert('RGB'))
+            bg_array = np.array(bg_img.convert('RGB'))
+            
+            # Analyze color temperature and lighting
+            char_temp = self._calculate_color_temperature(char_array)
+            bg_temp = self._calculate_color_temperature(bg_array)
+            
+            # Analyze brightness and contrast
+            char_brightness = np.mean(char_array)
+            bg_brightness = np.mean(bg_array)
+            
+            # Adjust character to match background style
+            if abs(char_temp - bg_temp) > 500:  # Significant temperature difference
+                char_img = self._adjust_color_temperature(char_img, bg_temp - char_temp)
+            
+            if abs(char_brightness - bg_brightness) > 20:  # Significant brightness difference
+                brightness_factor = bg_brightness / char_brightness if char_brightness > 0 else 1.0
+                brightness_factor = max(0.5, min(2.0, brightness_factor))  # Limit adjustment
+                enhancer = ImageEnhance.Brightness(char_img)
+                char_img = enhancer.enhance(brightness_factor)
+            
+            # Match contrast levels
+            char_contrast = np.std(char_array)
+            bg_contrast = np.std(bg_array)
+            
+            if char_contrast > 0:
+                contrast_factor = bg_contrast / char_contrast
+                contrast_factor = max(0.7, min(1.5, contrast_factor))  # Limit adjustment
+                enhancer = ImageEnhance.Contrast(char_img)
+                char_img = enhancer.enhance(contrast_factor)
+            
+            return char_img, bg_img
+            
+        except Exception as e:
+            logger.error(f"Error matching image styles: {e}")
+            return char_img, bg_img
+    
+    def _calculate_color_temperature(self, img_array):
+        """Estimate color temperature of an image"""
+        try:
+            r_avg = np.mean(img_array[:, :, 0])
+            g_avg = np.mean(img_array[:, :, 1])
+            b_avg = np.mean(img_array[:, :, 2])
+            
+            # Simple color temperature estimation
+            if b_avg > r_avg:
+                return 6500 + (b_avg - r_avg) * 20  # Cooler
+            else:
+                return 3200 + (r_avg - b_avg) * 20  # Warmer
+        except:
+            return 5500  # Default daylight
+    
+    def _adjust_color_temperature(self, img, temp_shift):
+        """Adjust color temperature of an image"""
+        try:
+            img_array = np.array(img, dtype=np.float32)
+            
+            if temp_shift > 0:  # Make cooler (more blue)
+                img_array[:, :, 2] *= (1 + temp_shift / 10000)  # Increase blue
+                img_array[:, :, 0] *= (1 - temp_shift / 20000)  # Decrease red
+            else:  # Make warmer (more red)
+                img_array[:, :, 0] *= (1 - temp_shift / 10000)  # Increase red
+                img_array[:, :, 2] *= (1 + temp_shift / 20000)  # Decrease blue
+            
+            img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+            return Image.fromarray(img_array, mode=img.mode)
+        except Exception as e:
+            logger.error(f"Error adjusting color temperature: {e}")
+            return img
+    
+    def _analyze_positioning(self, character_desc, background_desc):
+        """
+        Analyze character and background descriptions to determine optimal positioning
+        Returns positioning and sizing information
+        """
+        position_info = {
+            'char_position': 'center',  # center, left, right
+            'char_size_factor': 0.6,    # Size relative to background
+            'char_vertical_pos': 0.7,   # 0.0 = top, 1.0 = bottom
+            'depth_layer': 'foreground', # foreground, midground, background
+            'interaction_type': 'standing' # standing, sitting, action, etc.
+        }
+        
+        try:
+            # Analyze character description for positioning clues
+            char_lower = character_desc.lower()
+            bg_lower = background_desc.lower()
+            
+            # Determine horizontal position
+            if any(word in char_lower for word in ['left', 'side', 'corner']):
+                position_info['char_position'] = 'left'
+            elif any(word in char_lower for word in ['right', 'side', 'corner']):
+                position_info['char_position'] = 'right'
+            
+            # Determine size based on environment scale
+            if any(word in bg_lower for word in ['vast', 'enormous', 'massive', 'grand', 'towering']):
+                position_info['char_size_factor'] = 0.4  # Smaller in grand environments
+            elif any(word in bg_lower for word in ['intimate', 'small', 'cozy', 'narrow']):
+                position_info['char_size_factor'] = 0.8  # Larger in small spaces
+            
+            # Determine vertical position
+            if any(word in char_lower for word in ['flying', 'floating', 'hovering']):
+                position_info['char_vertical_pos'] = 0.3  # Higher up
+            elif any(word in char_lower for word in ['sitting', 'crouching', 'kneeling']):
+                position_info['char_vertical_pos'] = 0.9  # Lower down
+            
+            # Determine interaction type
+            if any(word in char_lower for word in ['running', 'jumping', 'fighting', 'dancing']):
+                position_info['interaction_type'] = 'action'
+            elif any(word in char_lower for word in ['sitting', 'resting', 'reading']):
+                position_info['interaction_type'] = 'sitting'
+            
+        except Exception as e:
+            logger.error(f"Error analyzing positioning: {e}")
+        
+        return position_info
+    
+    def _prepare_character_for_composition(self, char_img, position_info):
+        """
+        Prepare character image for composition (background removal, resizing, etc.)
+        Uses OpenCV for advanced processing
+        """
+        try:
+            # Resize character based on position info
+            target_size = int(min(char_img.size) * position_info['char_size_factor'])
+            aspect_ratio = char_img.size[0] / char_img.size[1]
+            
+            if aspect_ratio > 1:  # Wider than tall
+                new_size = (target_size, int(target_size / aspect_ratio))
+            else:  # Taller than wide
+                new_size = (int(target_size * aspect_ratio), target_size)
+            
+            char_img_resized = char_img.resize(new_size, Image.Resampling.LANCZOS)
+            
+            # Apply subtle background removal/softening
+            # Convert to OpenCV format
+            char_cv = cv2.cvtColor(np.array(char_img_resized.convert('RGB')), cv2.COLOR_RGB2BGR)
+            
+            # Create a soft mask to isolate the character (simple approach)
+            # This could be enhanced with more sophisticated segmentation
+            gray = cv2.cvtColor(char_cv, cv2.COLOR_BGR2GRAY)
+            _, mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+            
+            # Apply morphological operations to refine mask
+            kernel = np.ones((3, 3), np.uint8)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            
+            # Apply Gaussian blur to soften edges
+            mask = cv2.GaussianBlur(mask, (5, 5), 0)
+            
+            # Convert back to PIL with alpha channel
+            mask_pil = Image.fromarray(mask).convert('L')
+            char_img_resized.putalpha(mask_pil)
+            
+            return char_img_resized
+            
+        except Exception as e:
+            logger.error(f"Error preparing character: {e}")
+            return char_img.resize((300, 400))  # Fallback resize
+    
+    def _prepare_background_for_composition(self, bg_img, position_info):
+        """
+        Prepare background image for character placement
+        """
+        try:
+            # Standard background size (you can adjust this)
+            target_size = (800, 600)
+            bg_prepared = bg_img.resize(target_size, Image.Resampling.LANCZOS)
+            
+            # Apply subtle depth-of-field effect if character is in foreground
+            if position_info['depth_layer'] == 'foreground':
+                # Convert to OpenCV for blur
+                bg_cv = cv2.cvtColor(np.array(bg_prepared), cv2.COLOR_RGB2BGR)
+                # Light background blur for depth
+                bg_cv = cv2.GaussianBlur(bg_cv, (3, 3), 0)
+                bg_prepared = Image.fromarray(cv2.cvtColor(bg_cv, cv2.COLOR_BGR2RGB))
+            
+            return bg_prepared
+            
+        except Exception as e:
+            logger.error(f"Error preparing background: {e}")
+            return bg_img.resize((800, 600))
+    
+    def _composite_final_scene(self, char_img, bg_img, position_info):
+        """
+        Composite character onto background using proper positioning and blending
+        """
+        try:
+            # Create the final composition
+            final_img = bg_img.copy().convert('RGBA')
+            
+            # Calculate character position
+            bg_width, bg_height = bg_img.size
+            char_width, char_height = char_img.size
+            
+            # Horizontal positioning
+            if position_info['char_position'] == 'left':
+                x_offset = bg_width // 6
+            elif position_info['char_position'] == 'right':
+                x_offset = bg_width - char_width - (bg_width // 6)
+            else:  # center
+                x_offset = (bg_width - char_width) // 2
+            
+            # Vertical positioning
+            y_offset = int(bg_height * position_info['char_vertical_pos'] - char_height)
+            y_offset = max(0, min(y_offset, bg_height - char_height))
+            
+            # Composite character onto background
+            if char_img.mode == 'RGBA':
+                # Use alpha compositing
+                final_img.paste(char_img, (x_offset, y_offset), char_img)
+            else:
+                # Simple paste without alpha
+                final_img.paste(char_img, (x_offset, y_offset))
+            
+            return final_img.convert('RGB')
+            
+        except Exception as e:
+            logger.error(f"Error compositing final scene: {e}")
+            # Fallback: simple side-by-side composition
+            total_width = bg_img.size[0] + char_img.size[0]
+            max_height = max(bg_img.size[1], char_img.size[1])
+            
+            combined = Image.new('RGB', (total_width, max_height), (255, 255, 255))
+            combined.paste(bg_img, (0, 0))
+            combined.paste(char_img, (bg_img.size[0], 0))
+            return combined
+    
+    def _apply_scene_post_processing(self, combined_img, genre):
+        """
+        Apply final post-processing effects based on genre
+        """
+        try:
+            # Apply genre-specific effects
+            if genre in ['horror', 'mystery']:
+                # Darken and increase contrast
+                enhancer = ImageEnhance.Brightness(combined_img)
+                combined_img = enhancer.enhance(0.8)
+                enhancer = ImageEnhance.Contrast(combined_img)
+                combined_img = enhancer.enhance(1.2)
+                
+            elif genre in ['fantasy', 'adventure']:
+                # Enhance colors and saturation
+                enhancer = ImageEnhance.Color(combined_img)
+                combined_img = enhancer.enhance(1.1)
+                
+            elif genre in ['romance', 'drama']:
+                # Soften and warm the image
+                enhancer = ImageEnhance.Contrast(combined_img)
+                combined_img = enhancer.enhance(0.9)
+                
+            elif genre == 'sci-fi':
+                # Cool the colors slightly
+                img_array = np.array(combined_img, dtype=np.float32)
+                img_array[:, :, 2] *= 1.05  # Slight blue boost
+                img_array[:, :, 0] *= 0.98  # Slight red reduction
+                combined_img = Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
+            
+            # Apply subtle sharpening
+            combined_img = combined_img.filter(ImageFilter.UnsharpMask(radius=1, percent=50, threshold=2))
+            
+            return combined_img
+            
+        except Exception as e:
+            logger.error(f"Error in post-processing: {e}")
+            return combined_img
     
     def generate_complete_story(self, prompt, length='medium', genre='fantasy'):
         """Generate story, character description, and background description in a single chain - IMPROVED VERSION"""

@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const loadingAlert = document.createElement('div');
             loadingAlert.className = 'alert alert-info mt-3';
-            loadingAlert.innerHTML = '<i class="fas fa-magic"></i> Creating your story... This may take up to 30 seconds.';
+            loadingAlert.innerHTML = '<i class="fas fa-magic"></i> Creating your story... This may take up to 3 minutes.';
             form.appendChild(loadingAlert);
         });
     }

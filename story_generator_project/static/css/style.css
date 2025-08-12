@@ -106,3 +106,27 @@ footer {
         transform: rotate(360deg);
     }
 }
+
+.bg-gradient-primary {
+    background: linear-gradient(45deg, #007bff, #6f42c1) !important;
+}
+
+.character-description, .background-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    text-align: justify;
+}
+
+.story-text {
+    font-size: 1.1rem;
+    line-height: 1.8;
+    text-align: justify;
+}
+
+.card.h-100 {
+    height: 100% !important;
+}
+
+.progress {
+    height: 20px;
+}

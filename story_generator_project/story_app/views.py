@@ -19,7 +19,7 @@ def index(request):
 
 @require_http_methods(["POST"])
 def generate_story(request):
-    """Handle complete story generation with character and background images using multiple chains"""
+    """Handle complete story generation with character, background, and combined scene images"""
     form = StoryPromptForm(request.POST)
     
     if form.is_valid():
@@ -30,42 +30,66 @@ def generate_story(request):
         try:
             story_service = StoryGeneratorService()
             
-            # Generate complete story package with both images
-            messages.info(request, 'Creating your complete story package with images... This may take a few moments.')
+            # Generate complete story package with combined scene
+            messages.info(request, 'Creating your complete story package with images and combined scene... This may take a few moments.')
             complete_story = story_service.generate_complete_story_with_images(prompt, length, genre)
             logger.info(f"Generated complete story package for prompt: {prompt[:50]}...")
             
-            # Extract image data
+            # Extract all image data
             character_image = complete_story.get('character_image', {})
             background_image = complete_story.get('background_image', {})
+            combined_scene = complete_story.get('combined_scene', {})
             
-            # Save to database with both image sets
+            # Save to database with all image sets including combined scene
             story_obj = StoryGeneration.objects.create(
                 prompt=prompt,
                 generated_story=complete_story['story'],
                 character_description=complete_story['character_description'],
                 background_description=complete_story['background_description'],
+                
+                # Character image data
                 character_image_data=character_image.get('image_data'),
                 character_image_prompt=character_image.get('prompt'),
                 character_image_model=character_image.get('model_used'),
+                
+                # Background image data
                 background_image_data=background_image.get('image_data'),
                 background_image_prompt=background_image.get('prompt'),
                 background_image_model=background_image.get('model_used'),
+                
+                # NEW: Combined scene data
+                combined_scene_data=combined_scene.get('image_data'),
+                combined_scene_prompt=combined_scene.get('prompt'),
+                combined_scene_model=combined_scene.get('model_used'),
+                combination_info=combined_scene.get('composition_info'),
+                
                 genre=genre,
                 story_length=length
             )
             
-            # Create success message based on what was generated
-            success_parts = ['Your tale, character profile, and world guide']
+            # Create comprehensive success message
+            success_parts = ['Your complete story']
+            
             if character_image.get('success'):
                 success_parts.append('character portrait')
             if background_image.get('success'):
                 success_parts.append('environment artwork')
+            if combined_scene.get('success'):
+                success_parts.append('combined scene composition')
             
-            if len(success_parts) > 1:
-                success_msg = f"Complete story package ready! {', '.join(success_parts[:-1])}, and {success_parts[-1]} are all set!"
+            # Generate success message based on what was created
+            if len(success_parts) > 3:
+                success_msg = f"🎉 Complete story package ready! {', '.join(success_parts[:-1])}, and {success_parts[-1]} are all set!"
+            elif len(success_parts) > 1:
+                success_msg = f"✨ Story package created! {', '.join(success_parts[:-1])}, and {success_parts[-1]} generated successfully!"
             else:
-                success_msg = f"{success_parts[0]} are ready! (Image generation failed, but story is complete)"
+                success_msg = "📖 Your story is ready! (Image generation encountered issues, but the story is complete)"
+            
+            # Add specific combined scene success info
+            if combined_scene.get('success'):
+                composition_info = combined_scene.get('composition_info', {})
+                char_pos = composition_info.get('char_position', 'center')
+                success_msg += f" Character positioned {char_pos} in the scene."
             
             messages.success(request, success_msg)
             
@@ -74,12 +98,13 @@ def generate_story(request):
                 'prompt': prompt,
                 'genre': genre.title(),
                 'length': length.title(),
-                'image_generation_attempted': True
+                'image_generation_attempted': True,
+                'combined_scene_generated': combined_scene.get('success', False)
             })
             
         except Exception as e:
-            logger.error(f"Error generating story: {e}")
-            messages.error(request, 'Sorry, there was an error generating your story. Please try again.')
+            logger.error(f"Error generating story with combined scene: {e}")
+            messages.error(request, 'Sorry, there was an error generating your story package. Please try again.')
             return redirect('index')
     
     else:
@@ -90,20 +115,21 @@ def generate_story(request):
         })
 
 def story_detail(request, story_id):
-    """View a specific story with all its details"""
+    """View a specific story with all its details including combined scene"""
     try:
         story_obj = StoryGeneration.objects.get(id=story_id)
         return render(request, 'story_app/story_result.html', {
             'story_obj': story_obj,
             'genre': story_obj.genre_display if story_obj.genre else 'Unknown',
-            'length': story_obj.story_length.title() if story_obj.story_length else 'Unknown'
+            'length': story_obj.story_length.title() if story_obj.story_length else 'Unknown',
+            'combined_scene_generated': story_obj.has_combined_scene
         })
     except StoryGeneration.DoesNotExist:
         messages.error(request, 'Story not found.')
         return redirect('index')
 
 def story_list(request):
-    """View all generated stories"""
+    """View all generated stories with combined scene indicators"""
     stories = StoryGeneration.objects.all()[:20]
     return render(request, 'story_app/story_list.html', {'stories': stories})
 
@@ -118,3 +144,31 @@ def delete_story(request, story_id):
             messages.error(request, 'Story not found.')
     
     return redirect('index')
+
+def download_combined_scene(request, story_id):
+    """NEW: Download the combined scene image as a file"""
+    try:
+        story_obj = StoryGeneration.objects.get(id=story_id)
+        if not story_obj.has_combined_scene:
+            messages.error(request, 'No combined scene available for this story.')
+            return redirect('story_detail', story_id=story_id)
+        
+        import base64
+        from django.http import HttpResponse
+        
+        # Decode the base64 image
+        image_data = base64.b64decode(story_obj.combined_scene_data)
+        
+        # Create response with proper headers
+        response = HttpResponse(image_data, content_type='image/png')
+        response['Content-Disposition'] = f'attachment; filename="story_{story_id}_scene.png"'
+        
+        return response
+        
+    except StoryGeneration.DoesNotExist:
+        messages.error(request, 'Story not found.')
+        return redirect('index')
+    except Exception as e:
+        logger.error(f"Error downloading combined scene: {e}")
+        messages.error(request, 'Error downloading image.')
+        return redirect('story_detail', story_id=story_id)

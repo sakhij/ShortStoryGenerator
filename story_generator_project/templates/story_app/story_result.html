@@ -12,161 +12,319 @@
             </a>
         </div>
 
-        <!-- Story Content with Background Image -->
+        <!-- NEW: Combined Scene Section (Featured prominently at the top) -->
+        {% if story_obj.has_combined_scene %}
+        <div class="card shadow-lg mb-4 border-success">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-image"></i> Complete Scene
+                </h4>
+                <div class="btn-group">
+                    <button class="btn btn-light btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#sceneDetails" aria-expanded="false">
+                        <i class="fas fa-info-circle"></i> Details
+                    </button>
+                    <a href="{% url 'download_combined_scene' story_obj.id %}" class="btn btn-light btn-sm">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- Main Combined Scene Image -->
+                <div class="text-center position-relative">
+                    <img src="{{ story_obj.combined_scene_url }}" alt="Complete Story Scene"
+                        class="img-fluid w-100" style="max-height: 500px; object-fit: contain;">
+                    
+                    <!-- Scene composition overlay info -->
+                    <div class="position-absolute top-0 end-0 m-2">
+                        <span class="badge bg-dark bg-opacity-75">
+                            <i class="fas fa-layer-group"></i> Combined Scene
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Collapsible Scene Details -->
+                <div class="collapse" id="sceneDetails">
+                    <div class="card-body bg-light">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-palette"></i> Composition Info</h6>
+                                <p class="mb-1"><strong>Layout:</strong> {{ story_obj.composition_summary }}</p>
+                                <p class="mb-1"><strong>Compositor:</strong> {{ story_obj.combined_scene_model }}</p>
+                                {% if story_obj.combined_scene_prompt %}
+                                <p class="mb-0"><strong>Process:</strong> {{ story_obj.combined_scene_prompt }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-cogs"></i> Technical Details</h6>
+                                <p class="mb-1"><strong>Source Images:</strong> Character + Environment</p>
+                                <p class="mb-1"><strong>Style Matching:</strong> Color temperature & lighting adjusted</p>
+                                <p class="mb-0"><strong>Post-processing:</strong> {{ story_obj.genre_display }} genre enhancement</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Story Content -->
         <div class="card shadow-lg mb-4">
-            <div class="card-header bg-success text-white">
-                <h4 class="mb-0">Story</h4>
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-book-open"></i> Story</h4>
                 {% if prompt %}
                 <small>Based on: "{{ prompt }}"</small>
                 {% endif %}
             </div>
             <div class="card-body">
-                <!-- Story Text -->
                 <div class="story-text">
                     {{ story_obj.generated_story|linebreaksbr }}
                 </div>
             </div>
         </div>
 
-        <!-- Character Description with Image -->
-        {% if story_obj.character_description %}
+        <!-- Individual Images Section (Tabbed Interface for cleaner presentation) -->
+        {% if story_obj.has_character_image or story_obj.has_background_image %}
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-info text-white">
-                <h4 class="mb-0">Main Character</h4>
+                <h4 class="mb-0"><i class="fas fa-images"></i> Individual Components</h4>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <!-- Character Description -->
-                    <div class="{% if story_obj.has_character_image %}col-md-8{% else %}col-12{% endif %}">
-                        {{ story_obj.character_description|linebreaksbr }}
-                    </div>
-
-                    <!-- Character Image -->
+                <ul class="nav nav-tabs" id="imageTab" role="tablist">
                     {% if story_obj.has_character_image %}
-                    <div class="col-md-4">
-                        <div class="text-center">
-                            <h6 class="mb-2">Character Portrait</h6>
-                            <img src="{{ story_obj.character_image_url }}" alt="Character Portrait"
-                                class="img-fluid rounded shadow" style="max-width: 300px; max-height: 300px;">
-                            {% if story_obj.character_image_model %}
-                            <small class="text-muted d-block mt-2">
-                                Generated with: {{ story_obj.character_image_model|truncatechars:30 }}
-                            </small>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% elif image_generation_attempted %}
-                    <div class="col-md-4">
-                        <div class="text-center">
-                            <div class="alert alert-warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <small>Character image generation failed</small>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="character-tab" data-bs-toggle="tab"
+                            data-bs-target="#character" type="button" role="tab">
+                            <i class="fas fa-user"></i> Character
+                        </button>
+                    </li>
+                    {% endif %}
+                    {% if story_obj.has_background_image %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if not story_obj.has_character_image %}active{% endif %}" 
+                            id="environment-tab" data-bs-toggle="tab" data-bs-target="#environment" type="button" role="tab">
+                            <i class="fas fa-mountain"></i> Environment
+                        </button>
+                    </li>
+                    {% endif %}
+                </ul>
+
+                <div class="tab-content" id="imageTabContent">
+                    <!-- Character Tab -->
+                    {% if story_obj.has_character_image %}
+                    <div class="tab-pane fade show active" id="character" role="tabpanel">
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <div class="text-center">
+                                    <img src="{{ story_obj.character_image_url }}" alt="Character Portrait"
+                                        class="img-fluid rounded shadow" style="max-width: 300px; max-height: 400px;">
+                                    {% if story_obj.character_image_model %}
+                                    <small class="text-muted d-block mt-2">
+                                        Generated with: {{ story_obj.character_image_model|truncatechars:30 }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <h6>Character Description</h6>
+                                {{ story_obj.character_description|linebreaksbr }}
                             </div>
                         </div>
+                        
+                        {% if story_obj.character_image_prompt %}
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#characterPrompt" aria-expanded="false">
+                                <i class="fas fa-code"></i> View Generation Prompt
+                            </button>
+                            <div class="collapse mt-2" id="characterPrompt">
+                                <div class="card card-body bg-light">
+                                    <small class="text-muted">{{ story_obj.character_image_prompt }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     {% endif %}
-                </div>
 
-                <!-- Character Image prompt info (collapsible) -->
-                {% if story_obj.character_image_prompt %}
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#characterPrompt" aria-expanded="false">
-                        <i class="fas fa-user"></i> View Character Prompt
-                    </button>
-                    <div class="collapse mt-2" id="characterPrompt">
-                        <div class="card card-body bg-light">
-                            <small class="text-muted">{{ story_obj.character_image_prompt }}</small>
+                    <!-- Environment Tab -->
+                    {% if story_obj.has_background_image %}
+                    <div class="tab-pane fade {% if not story_obj.has_character_image %}show active{% endif %}" 
+                         id="environment" role="tabpanel">
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <h6>Environment Description</h6>
+                                {{ story_obj.background_description|linebreaksbr }}
+                            </div>
                         </div>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
+                        
+                        <div class="row mt-3">
+                            <div class="col-12 text-center">
+                                <img src="{{ story_obj.background_image_url }}" alt="Story Environment"
+                                    class="img-fluid rounded shadow"
+                                    style="max-width: 100%; max-height: 400px; object-fit: contain;">
+                                {% if story_obj.background_image_model %}
+                                <small class="text-muted d-block mt-2">
+                                    Generated with: {{ story_obj.background_image_model|truncatechars:30 }}
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
 
-        <!-- Background Description -->
-        {% if story_obj.background_description %}
-        <div class="card shadow-lg mb-4">
-            <div class="card-header bg-warning text-white">
-                <h4 class="mb-0">Background Description</h4>
-            </div>
-            <div class="card-body">
-                {{ story_obj.background_description|linebreaksbr }}
-                <!-- Background Image (if available) -->
-                {% if story_obj.has_background_image %}
-                <div class="row mb-3">
-                    <div class="col-12 text-center">
-                        <h6 class="mb-2">Story Setting</h6>
-                        <img src="{{ story_obj.background_image_url }}" alt="Story Setting"
-                            class="img-fluid rounded shadow"
-                            style="max-width: 100%; max-height: 400px; object-fit: cover;">
-                        {% if story_obj.background_image_model %}
-                        <small class="text-muted d-block mt-2">
-                            Environment by: {{ story_obj.background_image_model|truncatechars:30 }}
-                        </small>
+                        {% if story_obj.background_image_prompt %}
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#backgroundPrompt" aria-expanded="false">
+                                <i class="fas fa-code"></i> View Generation Prompt
+                            </button>
+                            <div class="collapse mt-2" id="backgroundPrompt">
+                                <div class="card card-body bg-light">
+                                    <small class="text-muted">{{ story_obj.background_image_prompt }}</small>
+                                </div>
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
                     {% endif %}
                 </div>
+            </div>
+        </div>
+        {% endif %}
 
-                <!-- Background Image prompt info (collapsible) -->
-                {% if story_obj.background_image_prompt %}
+        <!-- Generation Process Summary -->
+        <div class="card shadow-lg mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0"><i class="fas fa-cog"></i> Generation Summary</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Genre:</strong> {{ genre|default:"Unknown" }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Length:</strong> {{ length|default:"Unknown" }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Generated:</strong> {{ story_obj.created_at|date:"M d, Y H:i" }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Images:</strong> {{ story_obj.image_generation_summary|join:", "|default:"None" }}
+                    </div>
+                </div>
+                
+                <!-- Generation Chain Process -->
                 <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#backgroundPrompt" aria-expanded="false">
-                        <i class="fas fa-image"></i> View Environment Prompt
-                    </button>
-                    <div class="collapse mt-2" id="backgroundPrompt">
-                        <div class="card card-body bg-light">
-                            <small class="text-muted">{{ story_obj.background_image_prompt }}</small>
+                    <h6><i class="fas fa-project-diagram"></i> LangChain Process Flow</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-primary">1. Story Generation</span>
+                        <i class="fas fa-arrow-right text-muted align-self-center"></i>
+                        <span class="badge bg-info">2. Character Description</span>
+                        <i class="fas fa-arrow-right text-muted align-self-center"></i>
+                        <span class="badge bg-warning text-dark">3. Environment Description</span>
+                        <i class="fas fa-arrow-right text-muted align-self-center"></i>
+                        <span class="badge bg-success">4. Image Generation</span>
+                        {% if story_obj.has_combined_scene %}
+                        <i class="fas fa-arrow-right text-muted align-self-center"></i>
+                        <span class="badge bg-danger">5. Scene Composition</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Image Generation Status -->
+                {% if image_generation_attempted %}
+                <div class="mt-3">
+                    <h6><i class="fas fa-chart-bar"></i> Generation Results</h6>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% if story_obj.has_character_image %}
+                                <i class="fas fa-check-circle text-success fa-2x"></i>
+                                <small class="d-block">Character Image</small>
+                                {% else %}
+                                <i class="fas fa-times-circle text-danger fa-2x"></i>
+                                <small class="d-block">Character Failed</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% if story_obj.has_background_image %}
+                                <i class="fas fa-check-circle text-success fa-2x"></i>
+                                <small class="d-block">Environment Image</small>
+                                {% else %}
+                                <i class="fas fa-times-circle text-danger fa-2x"></i>
+                                <small class="d-block">Environment Failed</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% if story_obj.has_combined_scene %}
+                                <i class="fas fa-check-circle text-success fa-2x"></i>
+                                <small class="d-block">Combined Scene</small>
+                                {% else %}
+                                <i class="fas fa-times-circle text-warning fa-2x"></i>
+                                <small class="d-block">Scene Combination</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center">
+                                {% if story_obj.has_complete_image_set %}
+                                <i class="fas fa-trophy text-warning fa-2x"></i>
+                                <small class="d-block">Complete Package</small>
+                                {% else %}
+                                <i class="fas fa-medal text-primary fa-2x"></i>
+                                <small class="d-block">Partial Package</small>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
                 {% endif %}
             </div>
         </div>
-        {% endif %}
 
-        <!-- Story Details -->
+        <!-- Action Buttons -->
         <div class="card shadow-lg">
-            <div class="card-header bg-secondary text-white">
-                <h4 class="mb-0">Story Details</h4>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% if genre %}
-                    <div class="col-md-3">
-                        <strong>Genre:</strong> {{ genre }}
-                    </div>
+            <div class="card-body text-center">
+                <div class="btn-group" role="group">
+                    <a href="{% url 'index' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Generate New Story
+                    </a>
+                    {% if story_obj.has_combined_scene %}
+                    <a href="{% url 'download_combined_scene' story_obj.id %}" class="btn btn-outline-success">
+                        <i class="fas fa-download"></i> Download Scene
+                    </a>
                     {% endif %}
-                    {% if length %}
-                    <div class="col-md-3">
-                        <strong>Length:</strong> {{ length }}
-                    </div>
-                    {% endif %}
-                    <div class="col-md-2">
-                        <strong>Generated:</strong> {{ story_obj.created_at|date:"M d, Y H:i" }}
-                    </div>
-                    {% if story_obj.has_character_image %}
-                    <div class="col-md-2">
-                        <strong>Character:</strong> <i class="fas fa-check text-success"></i> Generated
-                    </div>
-                    {% endif %}
-                    {% if story_obj.has_background_image %}
-                    <div class="col-md-2">
-                        <strong>Environment:</strong> <i class="fas fa-check text-success"></i> Generated
-                    </div>
-                    {% endif %}
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                        <i class="fas fa-trash"></i> Delete Story
+                    </button>
                 </div>
-                {% if story_obj.has_character_image %}
-                <div class="col-md-3">
-                    <strong>Image:</strong> <i class="fas fa-check text-success"></i> Generated
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Story</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this story and all its images? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="{% url 'delete_story' story_obj.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

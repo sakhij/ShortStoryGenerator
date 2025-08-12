@@ -19,7 +19,7 @@ def index(request):
 
 @require_http_methods(["POST"])
 def generate_story(request):
-    """Handle story generation with detailed character and background descriptions"""
+    """Handle complete story generation with character and background images using multiple chains"""
     form = StoryPromptForm(request.POST)
     
     if form.is_valid():
@@ -30,31 +30,51 @@ def generate_story(request):
         try:
             story_service = StoryGeneratorService()
             
-            # Generate main story
-            story = story_service.generate_story(prompt, length, genre)
-            logger.info(f"Generated story for prompt: {prompt[:50]}...")
+            # Generate complete story package with both images
+            messages.info(request, 'Creating your complete story package with images... This may take a few moments.')
+            complete_story = story_service.generate_complete_story_with_images(prompt, length, genre)
+            logger.info(f"Generated complete story package for prompt: {prompt[:50]}...")
             
-            # Generate character and background descriptions
-            character_description = story_service.generate_character_description(story)
-            background_description = story_service.generate_background_description(story, genre)
+            # Extract image data
+            character_image = complete_story.get('character_image', {})
+            background_image = complete_story.get('background_image', {})
             
-            # Save to database
+            # Save to database with both image sets
             story_obj = StoryGeneration.objects.create(
                 prompt=prompt,
-                generated_story=story,
-                character_description=character_description,
-                background_description=background_description,
+                generated_story=complete_story['story'],
+                character_description=complete_story['character_description'],
+                background_description=complete_story['background_description'],
+                character_image_data=character_image.get('image_data'),
+                character_image_prompt=character_image.get('prompt'),
+                character_image_model=character_image.get('model_used'),
+                background_image_data=background_image.get('image_data'),
+                background_image_prompt=background_image.get('prompt'),
+                background_image_model=background_image.get('model_used'),
                 genre=genre,
                 story_length=length
             )
             
-            messages.success(request, 'Story complete! Your tale, character profile, and world guide are ready!')
+            # Create success message based on what was generated
+            success_parts = ['Your tale, character profile, and world guide']
+            if character_image.get('success'):
+                success_parts.append('character portrait')
+            if background_image.get('success'):
+                success_parts.append('environment artwork')
+            
+            if len(success_parts) > 1:
+                success_msg = f"Complete story package ready! {', '.join(success_parts[:-1])}, and {success_parts[-1]} are all set!"
+            else:
+                success_msg = f"{success_parts[0]} are ready! (Image generation failed, but story is complete)"
+            
+            messages.success(request, success_msg)
             
             return render(request, 'story_app/story_result.html', {
                 'story_obj': story_obj,
                 'prompt': prompt,
                 'genre': genre.title(),
-                'length': length.title()
+                'length': length.title(),
+                'image_generation_attempted': True
             })
             
         except Exception as e:

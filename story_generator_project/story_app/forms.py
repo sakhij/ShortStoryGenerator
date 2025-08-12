@@ -15,9 +15,9 @@ class StoryPromptForm(forms.Form):
     
     story_length = forms.ChoiceField(
         choices=[
-            ('short', 'Short (50-100 words)'),
-            ('medium', 'Medium (100-200 words)'),
-            ('long', 'Long (200-250 words)')
+            ('short', 'Short (200-300 words)'),
+            ('medium', 'Medium (300-500 words)'),
+            ('long', 'Long (500-750 words)')
         ],
         widget=forms.Select(attrs={'class': 'form-control'}),
         initial='medium',

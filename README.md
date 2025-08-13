@@ -112,7 +112,7 @@ brew install python ffmpeg git
 1. **Clone the Repository**
    ```bash
    git clone https://github.com/sakhij/ShortStoryGenerator.git
-   cd ai-story-generator
+   cd story_generator_project
    ```
 
 2. **Create Virtual Environment**

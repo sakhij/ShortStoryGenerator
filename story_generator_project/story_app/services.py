@@ -13,6 +13,12 @@ import numpy as np
 import time
 import os
 from rembg import remove
+import whisper
+import tempfile
+import os
+from pydub import AudioSegment
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -51,7 +57,267 @@ class StoryGeneratorService:
             "landscape": "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
         }
 
+         # Initialize Whisper for audio transcription
+        try:
+            self.whisper_model = whisper.load_model("base") 
+            logger.info("Whisper model loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load Whisper model: {e}")
+            self.whisper_model = None
     
+    def transcribe_audio(self, audio_file):
+        """
+        Transcribe audio file to text using OpenAI Whisper
+        Returns dict with transcription, duration, and metadata
+        """
+        if not self.whisper_model:
+            logger.error("Whisper model not available")
+            return {
+                'transcription': None,
+                'duration': 0,
+                'success': False,
+                'error': 'Audio transcription service unavailable'
+            }
+        
+        try:
+            # Create temporary file to work with
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
+                # Read the uploaded file content
+                audio_file.seek(0)  # Make sure we're at the beginning
+                file_content = audio_file.read()
+                
+                # Write to temporary file
+                temp_file.write(file_content)
+                temp_file_path = temp_file.name
+            
+            try:
+                # Convert to compatible format if needed using pydub
+                try:
+                    audio = AudioSegment.from_file(temp_file_path)
+                    duration = len(audio) / 1000.0  # Convert to seconds
+                    
+                    # Convert to wav format if not already
+                    if not temp_file_path.endswith('.wav'):
+                        wav_path = temp_file_path.replace(temp_file_path.split('.')[-1], 'wav')
+                        audio.export(wav_path, format="wav")
+                        temp_file_path = wav_path
+                    
+                except Exception as e:
+                    logger.warning(f"Audio conversion failed, trying direct transcription: {e}")
+                    duration = 0
+                
+                # Transcribe using Whisper
+                logger.info(f"Transcribing audio file: {temp_file_path}")
+                result = self.whisper_model.transcribe(temp_file_path)
+                transcription = result["text"].strip()
+                
+                logger.info(f"Audio transcription successful: {transcription[:100]}...")
+                
+                return {
+                    'transcription': transcription,
+                    'duration': duration,
+                    'success': True,
+                    'language': result.get('language', 'unknown'),
+                    'segments': len(result.get('segments', []))
+                }
+                
+            finally:
+                # Clean up temporary files
+                try:
+                    os.unlink(temp_file_path)
+                    if 'wav_path' in locals() and wav_path != temp_file_path:
+                        os.unlink(wav_path)
+                except:
+                    pass
+                    
+        except Exception as e:
+            logger.error(f"Error transcribing audio: {e}")
+            return {
+                'transcription': None,
+                'duration': 0,
+                'success': False,
+                'error': str(e)
+            }
+    def generate_story_from_audio(self, audio_file, length='medium', genre='fantasy'):
+        """
+        Complete pipeline: transcribe audio -> generate story with images
+        """
+        try:
+            # Step 1: Transcribe audio
+            logger.info("Starting audio transcription...")
+            transcription_result = self.transcribe_audio(audio_file)
+            
+            if not transcription_result['success']:
+                return {
+                    'success': False,
+                    'error': transcription_result.get('error', 'Audio transcription failed'),
+                    'transcription_result': transcription_result
+                }
+            
+            transcription = transcription_result['transcription']
+            
+            if not transcription or len(transcription.strip()) < 10:
+                return {
+                    'success': False,
+                    'error': 'Audio transcription too short or empty',
+                    'transcription_result': transcription_result
+                }
+            
+            logger.info(f"Audio transcribed successfully: {len(transcription)} characters")
+            
+            # Step 2: Generate story using transcription as prompt
+            logger.info("Generating story from transcription...")
+            story_package = self.generate_complete_story_with_images(
+                prompt=transcription,
+                length=length,
+                genre=genre
+            )
+            
+            # Add transcription metadata to the package
+            story_package.update({
+                'transcription_result': transcription_result,
+                'audio_transcription': transcription,
+                'audio_duration': transcription_result['duration'],
+                'input_type': 'audio',
+                'success': True
+            })
+            
+            return story_package
+            
+        except Exception as e:
+            logger.error(f"Error in audio story generation pipeline: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'transcription_result': None
+            }
+    
+    def generate_story_from_mixed_input(self, text_prompt=None, audio_file=None, length='medium', genre='fantasy'):
+        """
+        Generate story from both text and audio inputs
+        """
+        try:
+            combined_prompt_parts = []
+            transcription_result = None
+            audio_duration = 0
+            
+            # Add text prompt if provided
+            if text_prompt and text_prompt.strip():
+                combined_prompt_parts.append(f"Text prompt: {text_prompt}")
+            
+            # Add audio transcription if provided
+            if audio_file:
+                logger.info("Transcribing audio for mixed input...")
+                transcription_result = self.transcribe_audio(audio_file)
+                
+                if transcription_result['success']:
+                    audio_duration = transcription_result['duration']
+                    combined_prompt_parts.append(f"Audio description: {transcription_result['transcription']}")
+                else:
+                    logger.warning(f"Audio transcription failed: {transcription_result.get('error')}")
+            
+            if not combined_prompt_parts:
+                return {
+                    'success': False,
+                    'error': 'No valid input provided (text or audio)',
+                    'transcription_result': transcription_result
+                }
+            
+            # Combine all inputs into a single prompt
+            combined_prompt = " | ".join(combined_prompt_parts)
+            
+            # Generate story using combined prompt
+            logger.info("Generating story from mixed input...")
+            story_package = self.generate_complete_story_with_images(
+                prompt=combined_prompt,
+                length=length,
+                genre=genre
+            )
+            
+            # Add metadata
+            story_package.update({
+                'transcription_result': transcription_result,
+                'audio_transcription': transcription_result['transcription'] if transcription_result and transcription_result['success'] else None,
+                'audio_duration': audio_duration,
+                'input_type': 'both',
+                'combined_prompt': combined_prompt,
+                'success': True
+            })
+            
+            return story_package
+            
+        except Exception as e:
+            logger.error(f"Error in mixed input story generation: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'transcription_result': transcription_result
+            }
+
+    # Add this helper method for audio file validation
+    def validate_audio_file(self, audio_file):
+        """Validate uploaded audio file"""
+        allowed_formats = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']
+        max_size = 10 * 1024 * 1024  # 10MB
+        max_duration = 300  # 5 minutes in seconds
+        
+        try:
+            # Check file size
+            if audio_file.size > max_size:
+                return {
+                    'valid': False,
+                    'error': f'File too large. Maximum size is {max_size / (1024*1024):.1f}MB'
+                }
+            
+            # Check file extension
+            file_ext = os.path.splitext(audio_file.name.lower())[1]
+            if file_ext not in allowed_formats:
+                return {
+                    'valid': False,
+                    'error': f'Unsupported format. Allowed formats: {", ".join(allowed_formats)}'
+                }
+            
+            # Quick duration check using pydub
+            try:
+                with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                    audio_file.seek(0)
+                    temp_file.write(audio_file.read())
+                    temp_file_path = temp_file.name
+                
+                audio = AudioSegment.from_file(temp_file_path)
+                duration = len(audio) / 1000.0  # Convert to seconds
+                
+                os.unlink(temp_file_path)
+                
+                if duration > max_duration:
+                    return {
+                        'valid': False,
+                        'error': f'Audio too long. Maximum duration is {max_duration/60:.1f} minutes'
+                    }
+                
+                return {
+                    'valid': True,
+                    'duration': duration,
+                    'format': file_ext
+                }
+                
+            except Exception as e:
+                logger.warning(f"Could not validate audio duration: {e}")
+                # If we can't check duration, still allow the file
+                return {
+                    'valid': True,
+                    'duration': 0,
+                    'format': file_ext,
+                    'warning': 'Could not validate audio duration'
+                }
+                
+        except Exception as e:
+            return {
+                'valid': False,
+                'error': f'Error validating audio file: {str(e)}'
+            }
+        
+
     def generate_complete_story_with_images(self, prompt, length='medium', genre='fantasy'):
         """Generate story, character description, background description, character image, and background image"""
         
@@ -98,7 +364,7 @@ class StoryGeneratorService:
         else:
             story_package['background_image'] = self._generate_placeholder_image("background")
         
-        # NEW: Combine character and background into a cohesive scene
+        # Combine character and background into a cohesive scene
         if (character_image_result and character_image_result.get('success') and 
             background_image_result and background_image_result.get('success')):
             try:
@@ -651,7 +917,7 @@ class StoryGeneratorService:
             return self._generate_mock_background_image_prompt(background_description, genre)
     
     def generate_character_image(self, character_description, visual_style, genre):
-        """Generate character image using free Hugging Face models - IMPROVED VERSION"""
+        """Generate character image using free Hugging Face models"""
         
         try:
             # First, generate optimized image prompt
@@ -661,8 +927,8 @@ class StoryGeneratorService:
             full_prompt = (
                 f"{image_prompt}, portrait, character design, centered composition, "
                 f"detailed face, professional lighting, high quality, masterpiece, "
-                f"transparent background, isolated subject, no background, no scenery"
-                f"Give the character with NO BACKGROUND, and give the full body shot, head to toe, character standing."
+                f"transparent background, isolated subject, PLAIN WHITE background, no scenery"
+                f"Give the character with PLAIN WHITE BACKGROUND, and give the full body shot, head to toe, character standing."
                 )
 
                         
@@ -690,7 +956,7 @@ class StoryGeneratorService:
             return self._generate_placeholder_image("character")
 
     def generate_background_image(self, background_description, story_context, visual_style, genre):
-        """Generate background/environment image using free Hugging Face models - IMPROVED VERSION"""
+        """Generate background/environment image using free Hugging Face models"""
         
         try:
             # First, generate optimized background image prompt

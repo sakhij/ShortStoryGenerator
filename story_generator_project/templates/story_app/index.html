@@ -10,12 +10,50 @@
                 <h2 class="card-title mb-0">
                     <i class="fas fa-magic"></i> Generate Your Story
                 </h2>
+                <small>Create stories from text prompts, audio recordings, or both!</small>
             </div>
             <div class="card-body">
-                <form method="post" action="{% url 'generate_story' %}" id="story-form">
+                <form method="post" action="{% url 'generate_story' %}" id="story-form" enctype="multipart/form-data">
                     {% csrf_token %}
                     
-                    <div class="mb-3">
+                    <!-- NEW: Input Type Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-keyboard"></i> Input Method
+                        </label>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="{{ form.input_type.name }}" 
+                                           id="input_text" value="text" checked onchange="toggleInputFields()">
+                                    <label class="form-check-label" for="input_text">
+                                        <i class="fas fa-keyboard"></i> Text Only
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="{{ form.input_type.name }}" 
+                                           id="input_audio" value="audio" onchange="toggleInputFields()">
+                                    <label class="form-check-label" for="input_audio">
+                                        <i class="fas fa-microphone"></i> Audio Only
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="{{ form.input_type.name }}" 
+                                           id="input_both" value="both" onchange="toggleInputFields()">
+                                    <label class="form-check-label" for="input_both">
+                                        <i class="fas fa-plus"></i> Text + Audio
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Text Prompt Section -->
+                    <div class="mb-3" id="text-prompt-section">
                         {{ form.prompt.label_tag }}
                         {{ form.prompt }}
                         <div class="form-text">{{ form.prompt.help_text }}</div>
@@ -28,6 +66,61 @@
                         {% endif %}
                     </div>
 
+                    <!-- NEW: Audio Upload Section -->
+                    <div class="mb-3" id="audio-upload-section" style="display: none;">
+                        <label for="{{ form.audio_file.id_for_label }}" class="form-label">
+                            <i class="fas fa-microphone"></i> {{ form.audio_file.label }}
+                        </label>
+                        <div class="input-group">
+                            {{ form.audio_file }}
+                            <button class="btn btn-outline-secondary" type="button" id="record-btn" onclick="toggleRecording()">
+                                <i class="fas fa-record-vinyl"></i> Record
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            {{ form.audio_file.help_text }}
+                            <br><strong>Or:</strong> Click "Record" to record directly from your microphone.
+                        </div>
+                        
+                        <!-- Audio Recording Controls (Initially Hidden) -->
+                        <div id="recording-controls" style="display: none;" class="mt-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <button type="button" class="btn btn-danger btn-sm" id="stop-recording" onclick="stopRecording()">
+                                    <i class="fas fa-stop"></i> Stop Recording
+                                </button>
+                                <div id="recording-status" class="text-muted">
+                                    <i class="fas fa-circle text-danger"></i> Recording...
+                                </div>
+                                <div id="recording-timer">00:00</div>
+                            </div>
+                        </div>
+
+                        <!-- Audio Preview (Initially Hidden) -->
+                        <div id="audio-preview" style="display: none;" class="mt-2">
+                            <label class="form-label">Preview:</label>
+                            <audio id="audio-player" controls class="w-100">
+                                Your browser does not support audio playback.
+                            </audio>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-success" onclick="useRecording()">
+                                    <i class="fas fa-check"></i> Use This Recording
+                                </button>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="discardRecording()">
+                                    <i class="fas fa-times"></i> Record Again
+                                </button>
+                            </div>
+                        </div>
+
+                        {% if form.audio_file.errors %}
+                            <div class="text-danger">
+                                {% for error in form.audio_file.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Story Configuration -->
                     <div class="row mb-3">
                         <div class="col-md-6">
                             {{ form.story_length.label_tag }}
@@ -40,7 +133,7 @@
                     </div>
 
                     <button type="submit" class="btn btn-success btn-lg w-100" id="generate-btn">
-                        <i class="fas fa-sparkles"></i> Generate Story
+                        <i class="fas fa-sparkles"></i> <span id="generate-btn-text">Generate Story</span>
                     </button>
                 </form>
             </div>
@@ -55,11 +148,31 @@
         <div class="list-group">
             {% for story in recent_stories %}
             <a href="{% url 'story_detail' story.id %}" class="list-group-item list-group-item-action">
-                <div class="d-flex w-100 justify-content-between">
-                    <h6 class="mb-1">{{ story.prompt|truncatechars:80 }}</h6>
-                    <small>{{ story.created_at|timesince }} ago</small>
+                <div class="d-flex w-100 justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center mb-1">
+                            <h6 class="mb-0 me-2">{{ story.effective_prompt|truncatechars:60 }}</h6>
+                            {% if story.has_audio %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-microphone"></i> Audio
+                                </span>
+                            {% endif %}
+                            {% if story.input_type == 'both' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-plus"></i> Mixed
+                                </span>
+                            {% endif %}
+                        </div>
+                        <p class="mb-1 text-muted">{{ story.generated_story|truncatechars:100 }}</p>
+                        <small class="text-muted">
+                            {{ story.genre_display }} • {{ story.input_type_display }}
+                            {% if story.audio_duration > 0 %}
+                                • Audio: {{ story.audio_duration|floatformat:1 }}s
+                            {% endif %}
+                        </small>
+                    </div>
+                    <small class="text-muted">{{ story.created_at|timesince }} ago</small>
                 </div>
-                <p class="mb-1">{{ story.generated_story|truncatechars:150 }}</p>
             </a>
             {% endfor %}
         </div>
@@ -71,13 +184,30 @@
     <div class="col-lg-8 mx-auto">
         <div class="card bg-light">
             <div class="card-body">
-                <h5>How it works:</h5>
-                <ul>
-                    <li>Enter a creative prompt describing your story idea</li>
-                    <li>Choose your preferred story length and genre</li>
-                    <li>Click generate and let AI create your unique story</li>
-                    <li>Get both the story and character descriptions</li>
-                </ul>
+                <h5><i class="fas fa-question-circle"></i> How it works:</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-keyboard"></i> Text Input</h6>
+                        <ul class="mb-3">
+                            <li>Type your creative story prompt</li>
+                            <li>Describe characters, settings, or situations</li>
+                            <li>Works great for detailed descriptions</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-microphone"></i> Audio Input</h6>
+                        <ul class="mb-3">
+                            <li>Record your story idea by speaking</li>
+                            <li>Upload audio files (MP3, WAV, etc.)</li>
+                            <li>Perfect for natural storytelling</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <strong><i class="fas fa-magic"></i> AI Processing:</strong> 
+                    Choose your input method → AI generates complete story with character descriptions → 
+                    Visual AI creates character portraits and environments → Everything gets combined into a beautiful scene!
+                </div>
             </div>
         </div>
     </div>

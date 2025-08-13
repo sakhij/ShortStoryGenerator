@@ -1,4 +1,3 @@
-# urls.py
 from django.urls import path
 from . import views
 
@@ -9,4 +8,5 @@ urlpatterns = [
     path('stories/', views.story_list, name='story_list'),
     path('delete/<int:story_id>/', views.delete_story, name='delete_story'),
     path('download/scene/<int:story_id>/', views.download_combined_scene, name='download_combined_scene'),
+    path('download/audio/<int:story_id>/', views.download_audio_file, name='download_audio_file'),
 ]

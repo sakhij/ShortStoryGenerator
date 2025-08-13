@@ -1,3 +1,4 @@
+# models.py - Enhanced with audio support
 from django.db import models
 
 class StoryGeneration(models.Model):
@@ -18,26 +19,37 @@ class StoryGeneration(models.Model):
         ('long', 'Long (200-250 words)'),
     ]
     
-    prompt = models.TextField(max_length=1000)
+    INPUT_TYPE_CHOICES = [
+        ('text', 'Text Only'),
+        ('audio', 'Audio Only'),
+        ('both', 'Text + Audio'),
+    ]
+    
+    # Original fields
+    prompt = models.TextField(max_length=1000, blank=True)  # Now optional
     generated_story = models.TextField()
     character_description = models.TextField(blank=True)
     background_description = models.TextField(blank=True)
     
-    # Character image fields
-    character_image_data = models.TextField(blank=True, null=True)  # Base64 encoded image
-    character_image_prompt = models.TextField(blank=True, null=True)  # Generated prompt
+    # Audio-related fields
+    audio_file = models.FileField(upload_to='audio_prompts/', blank=True, null=True)
+    audio_transcription = models.TextField(blank=True, null=True)  # Store transcribed text
+    audio_duration = models.FloatField(blank=True, null=True)  # Duration in seconds
+    input_type = models.CharField(max_length=10, choices=INPUT_TYPE_CHOICES, default='text')
+    
+    # Image fields (existing)
+    character_image_data = models.TextField(blank=True, null=True)
+    character_image_prompt = models.TextField(blank=True, null=True)
     character_image_model = models.CharField(max_length=100, blank=True, null=True)
     
-    # Background image fields
-    background_image_data = models.TextField(blank=True, null=True)  # Base64 encoded image
-    background_image_prompt = models.TextField(blank=True, null=True)  # Generated prompt
+    background_image_data = models.TextField(blank=True, null=True)
+    background_image_prompt = models.TextField(blank=True, null=True)
     background_image_model = models.CharField(max_length=100, blank=True, null=True)
     
-    # NEW: Combined scene image fields
-    combined_scene_data = models.TextField(blank=True, null=True)  # Base64 encoded combined image
-    combined_scene_prompt = models.TextField(blank=True, null=True)  # Description of combination
-    combined_scene_model = models.CharField(max_length=100, blank=True, null=True)  # Compositor used
-    combination_info = models.JSONField(blank=True, null=True)  # Position and composition data
+    combined_scene_data = models.TextField(blank=True, null=True)
+    combined_scene_prompt = models.TextField(blank=True, null=True)
+    combined_scene_model = models.CharField(max_length=100, blank=True, null=True)
+    combination_info = models.JSONField(blank=True, null=True)
     
     genre = models.CharField(max_length=20, choices=GENRE_CHOICES, default='fantasy')
     story_length = models.CharField(max_length=10, choices=LENGTH_CHOICES, default='medium')
@@ -47,7 +59,45 @@ class StoryGeneration(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"Story: {self.prompt[:50]}..." if len(self.prompt) > 50 else self.prompt
+        if self.input_type == 'audio' and self.audio_transcription:
+            display_text = self.audio_transcription[:50]
+        elif self.prompt:
+            display_text = self.prompt[:50]
+        else:
+            display_text = "Audio Story"
+        
+        return f"Story: {display_text}..." if len(display_text) > 45 else f"Story: {display_text}"
+    
+    @property
+    def effective_prompt(self):
+        """Return the effective prompt text (transcribed audio or text prompt)"""
+        if self.input_type == 'audio' and self.audio_transcription:
+            return self.audio_transcription
+        elif self.input_type == 'both':
+            combined = []
+            if self.prompt:
+                combined.append(f"Text: {self.prompt}")
+            if self.audio_transcription:
+                combined.append(f"Audio: {self.audio_transcription}")
+            return " | ".join(combined)
+        else:
+            return self.prompt or "No prompt available"
+    
+    @property
+    def has_audio(self):
+        """Check if story was generated from audio input"""
+        return bool(self.audio_file and self.audio_transcription)
+    
+    @property
+    def audio_file_url(self):
+        """Return URL for audio file if it exists"""
+        if self.audio_file:
+            return self.audio_file.url
+        return None
+    
+    @property
+    def input_type_display(self):
+        return dict(self.INPUT_TYPE_CHOICES).get(self.input_type, 'Unknown')
     
     @property
     def genre_display(self):
@@ -63,7 +113,7 @@ class StoryGeneration(models.Model):
     
     @property
     def has_combined_scene(self):
-        """NEW: Check if combined scene image exists"""
+        """Check if combined scene image exists"""
         return bool(self.combined_scene_data)
     
     @property
@@ -82,7 +132,7 @@ class StoryGeneration(models.Model):
     
     @property
     def combined_scene_url(self):
-        """NEW: Return data URL for displaying combined scene image"""
+        """Return data URL for displaying combined scene image"""
         if self.combined_scene_data:
             return f"data:image/png;base64,{self.combined_scene_data}"
         return None

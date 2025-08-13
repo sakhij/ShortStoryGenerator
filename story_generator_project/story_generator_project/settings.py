@@ -83,3 +83,35 @@ STATICFILES_DIRS = [
 ]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+# Media files configuration (for audio uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Audio file settings
+AUDIO_UPLOAD_PATH = 'audio_prompts/'
+ALLOWED_AUDIO_FORMATS = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']
+MAX_AUDIO_DURATION = 300  # 5 minutes in seconds
+MAX_AUDIO_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Whisper model settings
+WHISPER_MODEL = 'base'  # Options: tiny, base, small, medium, large
+WHISPER_DEVICE = 'cpu'  # or 'cuda' if you have GPU support
+
+# Audio processing settings
+AUDIO_PROCESSING = {
+    'TEMP_DIR': os.path.join(BASE_DIR, 'temp_audio'),
+    'MAX_DURATION': 300,  # 5 minutes
+    'WHISPER_MODEL': 'base',  # or 'small', 'medium' for better accuracy
+    'SUPPORTED_FORMATS': ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac'],
+}
+
+# Create temp directory
+TEMP_AUDIO_DIR = AUDIO_PROCESSING['TEMP_DIR']
+os.makedirs(TEMP_AUDIO_DIR, exist_ok=True)

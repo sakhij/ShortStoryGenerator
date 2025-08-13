@@ -50,10 +50,8 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
 *.log
 local_settings.py
-db.sqlite3
 
 # IPython
 profile_default/
@@ -96,15 +94,7 @@ venv.bak/
 */migrations/
 !*/migrations/__init__.py
 
-# Node modules (if using any frontend tools)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Webpack bundles
-/bundles/
-webpack-stats.json
-
-# Redis dump file
-dump.rdb
+temp_audio/
+*.wav
+audio_prompts/
+db.sqlite3

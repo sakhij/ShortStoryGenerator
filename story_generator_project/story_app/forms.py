@@ -1,6 +1,8 @@
+# forms.py - Enhanced with audio upload
 from django import forms
 
 class StoryPromptForm(forms.Form):
+    # Existing text prompt field
     prompt = forms.CharField(
         widget=forms.Textarea(attrs={
             'class': 'form-control',
@@ -10,7 +12,33 @@ class StoryPromptForm(forms.Form):
         }),
         max_length=1000,
         label='Story Prompt',
-        help_text='Describe the setting, character, or situation you want the story to be about.'
+        help_text='Describe the setting, character, or situation you want the story to be about.',
+        required=False  # Make optional when audio is provided
+    )
+    
+    # NEW: Audio upload field
+    audio_file = forms.FileField(
+        widget=forms.ClearableFileInput(attrs={
+            'class': 'form-control',
+            'accept': 'audio/*,.mp3,.wav,.m4a,.ogg',
+            'id': 'audio-upload'
+        }),
+        label='Audio Prompt (Optional)',
+        help_text='Upload an audio file describing your story idea. Supported formats: MP3, WAV, M4A, OGG (max 10MB)',
+        required=False
+    )
+    
+    # NEW: Input type selection
+    input_type = forms.ChoiceField(
+        choices=[
+            ('text', 'Text Only'),
+            ('audio', 'Audio Only'),
+            ('both', 'Text + Audio')
+        ],
+        widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
+        initial='text',
+        label='Input Method',
+        required=False
     )
     
     story_length = forms.ChoiceField(
@@ -39,3 +67,26 @@ class StoryPromptForm(forms.Form):
         initial='fantasy',
         label='Genre'
     )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        prompt = cleaned_data.get('prompt')
+        audio_file = cleaned_data.get('audio_file')
+        input_type = cleaned_data.get('input_type')
+        
+        # Validation logic
+        if input_type == 'text' and not prompt:
+            raise forms.ValidationError("Text prompt is required when using text input.")
+        
+        if input_type == 'audio' and not audio_file:
+            raise forms.ValidationError("Audio file is required when using audio input.")
+        
+        if input_type == 'both' and not (prompt or audio_file):
+            raise forms.ValidationError("At least one input method (text or audio) is required.")
+        
+        # File size validation (10MB limit)
+        if audio_file:
+            if audio_file.size > 10 * 1024 * 1024:  # 10MB in bytes
+                raise forms.ValidationError("Audio file must be smaller than 10MB.")
+        
+        return cleaned_data

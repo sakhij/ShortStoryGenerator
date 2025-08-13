@@ -12,7 +12,75 @@
             </a>
         </div>
 
-        <!-- NEW: Combined Scene Section (Featured prominently at the top) -->
+        <!-- NEW: Audio Input Information (if applicable) -->
+        {% if story_obj.has_audio %}
+        <div class="card shadow-lg mb-4 border-info">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-microphone"></i> Audio Input
+                </h4>
+                <div class="btn-group">
+                    <button class="btn btn-light btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#audioDetails" aria-expanded="false">
+                        <i class="fas fa-info-circle"></i> Details
+                    </button>
+                    {% if story_obj.audio_file %}
+                    <a href="{% url 'download_audio_file' story_obj.id %}" class="btn btn-light btn-sm">
+                        <i class="fas fa-download"></i> Download Audio
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Audio Player (if file exists) -->
+                {% if story_obj.audio_file_url %}
+                <div class="mb-3">
+                    <label class="form-label"><strong>Original Audio:</strong></label>
+                    <audio controls class="w-100">
+                        <source src="{{ story_obj.audio_file_url }}" type="audio/mpeg">
+                        Your browser does not support audio playback.
+                    </audio>
+                </div>
+                {% endif %}
+
+                <!-- Audio Transcription -->
+                {% if story_obj.audio_transcription %}
+                <div class="mb-3">
+                    <label class="form-label"><strong>Transcription:</strong></label>
+                    <div class="bg-light p-3 rounded">
+                        <i class="fas fa-quote-left text-muted"></i>
+                        {{ story_obj.audio_transcription }}
+                        <i class="fas fa-quote-right text-muted"></i>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Collapsible Audio Details -->
+                <div class="collapse" id="audioDetails">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-info-circle"></i> Audio Metadata</h6>
+                            {% if story_obj.audio_duration > 0 %}
+                            <p class="mb-1"><strong>Duration:</strong> {{ story_obj.audio_duration|floatformat:1 }} seconds</p>
+                            {% endif %}
+                            <p class="mb-1"><strong>Input Type:</strong> {{ story_obj.input_type_display }}</p>
+                            <p class="mb-0"><strong>Processing:</strong> OpenAI Whisper transcription</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-cogs"></i> Transcription Quality</h6>
+                            <p class="mb-1"><strong>Characters:</strong> {{ story_obj.audio_transcription|length }}</p>
+                            <p class="mb-1"><strong>Words:</strong> ~{{ story_obj.audio_transcription|wordcount }}</p>
+                            <p class="mb-0"><strong>Status:</strong> 
+                                <span class="badge bg-success">Transcribed Successfully</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Combined Scene Section (existing, but with enhanced info) -->
         {% if story_obj.has_combined_scene %}
         <div class="card shadow-lg mb-4 border-success">
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -30,20 +98,22 @@
                 </div>
             </div>
             <div class="card-body p-0">
-                <!-- Main Combined Scene Image -->
                 <div class="text-center position-relative">
                     <img src="{{ story_obj.combined_scene_url }}" alt="Complete Story Scene"
                         class="img-fluid w-100" style="max-height: 500px; object-fit: contain;">
                     
-                    <!-- Scene composition overlay info -->
                     <div class="position-absolute top-0 end-0 m-2">
                         <span class="badge bg-dark bg-opacity-75">
                             <i class="fas fa-layer-group"></i> Combined Scene
                         </span>
+                        {% if story_obj.has_audio %}
+                        <span class="badge bg-info bg-opacity-75 ms-1">
+                            <i class="fas fa-microphone"></i> From Audio
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
 
-                <!-- Collapsible Scene Details -->
                 <div class="collapse" id="sceneDetails">
                     <div class="card-body bg-light">
                         <div class="row">
@@ -56,10 +126,10 @@
                                 {% endif %}
                             </div>
                             <div class="col-md-6">
-                                <h6><i class="fas fa-cogs"></i> Technical Details</h6>
-                                <p class="mb-1"><strong>Source Images:</strong> Character + Environment</p>
+                                <h6><i class="fas fa-cogs"></i> Source Information</h6>
+                                <p class="mb-1"><strong>Story Source:</strong> {{ story_obj.input_type_display }}</p>
                                 <p class="mb-1"><strong>Style Matching:</strong> Color temperature & lighting adjusted</p>
-                                <p class="mb-0"><strong>Post-processing:</strong> {{ story_obj.genre_display }} genre enhancement</p>
+                                <p class="mb-0"><strong>Enhancement:</strong> {{ story_obj.genre_display }} genre effects</p>
                             </div>
                         </div>
                     </div>
@@ -71,9 +141,28 @@
         <!-- Story Content -->
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="fas fa-book-open"></i> Story</h4>
-                {% if prompt %}
-                <small>Based on: "{{ prompt }}"</small>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="fas fa-book-open"></i> Story</h4>
+                    <div>
+                        {% if story_obj.input_type == 'audio' %}
+                        <span class="badge bg-info">
+                            <i class="fas fa-microphone"></i> Generated from Audio
+                        </span>
+                        {% elif story_obj.input_type == 'both' %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-plus"></i> Text + Audio Input
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary">
+                            <i class="fas fa-keyboard"></i> Text Input
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if story_obj.effective_prompt %}
+                <small class="d-block mt-1">
+                    <strong>Based on:</strong> "{{ story_obj.effective_prompt|truncatechars:100 }}"
+                </small>
                 {% endif %}
             </div>
             <div class="card-body">
@@ -83,7 +172,7 @@
             </div>
         </div>
 
-        <!-- Individual Images Section (Tabbed Interface for cleaner presentation) -->
+        <!-- Individual Images Section (existing, unchanged) -->
         {% if story_obj.has_character_image or story_obj.has_background_image %}
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-info text-white">
@@ -191,7 +280,7 @@
         </div>
         {% endif %}
 
-        <!-- Generation Process Summary -->
+        <!-- Enhanced Generation Summary -->
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-secondary text-white">
                 <h4 class="mb-0"><i class="fas fa-cog"></i> Generation Summary</h4>
@@ -208,24 +297,54 @@
                         <strong>Generated:</strong> {{ story_obj.created_at|date:"M d, Y H:i" }}
                     </div>
                     <div class="col-md-3">
+                        <strong>Input:</strong> {{ story_obj.input_type_display }}
+                        {% if story_obj.has_audio %}
+                            <i class="fas fa-microphone text-info ms-1"></i>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Audio Processing Info -->
+                {% if story_obj.has_audio %}
+                <div class="row mt-2">
+                    <div class="col-md-3">
+                        <strong>Audio Duration:</strong> {{ story_obj.audio_duration|floatformat:1 }}s
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Transcription:</strong> {{ story_obj.audio_transcription|wordcount }} words
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Processing:</strong> Whisper → LangChain → Image Generation
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row mt-2">
+                    <div class="col-12">
                         <strong>Images:</strong> {{ story_obj.image_generation_summary|join:", "|default:"None" }}
                     </div>
                 </div>
                 
                 <!-- Generation Chain Process -->
                 <div class="mt-3">
-                    <h6><i class="fas fa-project-diagram"></i> LangChain Process Flow</h6>
+                    <h6><i class="fas fa-project-diagram"></i> Processing Flow</h6>
                     <div class="d-flex flex-wrap gap-2">
-                        <span class="badge bg-primary">1. Story Generation</span>
+                        {% if story_obj.has_audio %}
+                            <span class="badge bg-info">1. Audio → Text</span>
+                            <i class="fas fa-arrow-right text-muted align-self-center"></i>
+                            <span class="badge bg-primary">2. Story Generation</span>
+                        {% else %}
+                            <span class="badge bg-primary">1. Story Generation</span>
+                        {% endif %}
                         <i class="fas fa-arrow-right text-muted align-self-center"></i>
-                        <span class="badge bg-info">2. Character Description</span>
+                        <span class="badge bg-info">{{ story_obj.has_audio|yesno:"3,2" }}. Character Description</span>
                         <i class="fas fa-arrow-right text-muted align-self-center"></i>
-                        <span class="badge bg-warning text-dark">3. Environment Description</span>
+                        <span class="badge bg-warning text-dark">{{ story_obj.has_audio|yesno:"4,3" }}. Environment Description</span>
                         <i class="fas fa-arrow-right text-muted align-self-center"></i>
-                        <span class="badge bg-success">4. Image Generation</span>
+                        <span class="badge bg-success">{{ story_obj.has_audio|yesno:"5,4" }}. Image Generation</span>
                         {% if story_obj.has_combined_scene %}
                         <i class="fas fa-arrow-right text-muted align-self-center"></i>
-                        <span class="badge bg-danger">5. Scene Composition</span>
+                        <span class="badge bg-danger">{{ story_obj.has_audio|yesno:"6,5" }}. Scene Composition</span>
                         {% endif %}
                     </div>
                 </div>
@@ -235,7 +354,15 @@
                 <div class="mt-3">
                     <h6><i class="fas fa-chart-bar"></i> Generation Results</h6>
                     <div class="row">
-                        <div class="col-md-3">
+                        {% if story_obj.has_audio %}
+                        <div class="col-md-2">
+                            <div class="text-center">
+                                <i class="fas fa-check-circle text-success fa-2x"></i>
+                                <small class="d-block">Audio Transcribed</small>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-{{ story_obj.has_audio|yesno:'2,3' }}">
                             <div class="text-center">
                                 {% if story_obj.has_character_image %}
                                 <i class="fas fa-check-circle text-success fa-2x"></i>
@@ -246,7 +373,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-{{ story_obj.has_audio|yesno:'2,3' }}">
                             <div class="text-center">
                                 {% if story_obj.has_background_image %}
                                 <i class="fas fa-check-circle text-success fa-2x"></i>
@@ -257,7 +384,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-{{ story_obj.has_audio|yesno:'2,3' }}">
                             <div class="text-center">
                                 {% if story_obj.has_combined_scene %}
                                 <i class="fas fa-check-circle text-success fa-2x"></i>
@@ -268,7 +395,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-{{ story_obj.has_audio|yesno:'2,3' }}">
                             <div class="text-center">
                                 {% if story_obj.has_complete_image_set %}
                                 <i class="fas fa-trophy text-warning fa-2x"></i>
@@ -292,6 +419,11 @@
                     <a href="{% url 'index' %}" class="btn btn-primary">
                         <i class="fas fa-plus"></i> Generate New Story
                     </a>
+                    {% if story_obj.has_audio and story_obj.audio_file %}
+                    <a href="{% url 'download_audio_file' story_obj.id %}" class="btn btn-outline-info">
+                        <i class="fas fa-download"></i> Download Audio
+                    </a>
+                    {% endif %}
                     {% if story_obj.has_combined_scene %}
                     <a href="{% url 'download_combined_scene' story_obj.id %}" class="btn btn-outline-success">
                         <i class="fas fa-download"></i> Download Scene
@@ -315,7 +447,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                Are you sure you want to delete this story and all its images? This action cannot be undone.
+                Are you sure you want to delete this story and all its associated content (images{% if story_obj.has_audio %}, audio file{% endif %})? This action cannot be undone.
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

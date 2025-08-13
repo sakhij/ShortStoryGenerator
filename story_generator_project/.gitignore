@@ -97,4 +97,4 @@ venv.bak/
 temp_audio/
 *.wav
 audio_prompts/
-db.sqlite3
+*.sqlite3

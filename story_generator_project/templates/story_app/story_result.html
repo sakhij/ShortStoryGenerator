@@ -7,12 +7,12 @@
     <div class="col-lg-10 mx-auto">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2><i class="fas fa-book"></i> Your Generated Story</h2>
-            <a href="{% url 'index' %}" class="btn btn-primary">
+            <a href="{% url 'index' %}" class="btn btn-success">
                 <i class="fas fa-plus"></i> Generate New Story
             </a>
         </div>
 
-        <!-- NEW: Audio Input Information (if applicable) -->
+        <!-- Audio Input Information -->
         {% if story_obj.has_audio %}
         <div class="card shadow-lg mb-4 border-info">
             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
@@ -32,7 +32,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- Audio Player (if file exists) -->
+                <!-- Audio Player -->
                 {% if story_obj.audio_file_url %}
                 <div class="mb-3">
                     <label class="form-label"><strong>Original Audio:</strong></label>
@@ -80,7 +80,7 @@
         </div>
         {% endif %}
 
-        <!-- Combined Scene Section (existing, but with enhanced info) -->
+        <!-- Combined Scene Section -->
         {% if story_obj.has_combined_scene %}
         <div class="card shadow-lg mb-4 border-success">
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -172,7 +172,7 @@
             </div>
         </div>
 
-        <!-- Individual Images Section (existing, unchanged) -->
+        <!-- Individual Images Section -->
         {% if story_obj.has_character_image or story_obj.has_background_image %}
         <div class="card shadow-lg mb-4">
             <div class="card-header bg-info text-white">

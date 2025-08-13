@@ -1,4 +1,4 @@
-# AI Story Generator
+# Short Story Generator
 
 A Django-based web application that generates complete story packages with AI-powered text generation and visual artwork. Users can input story prompts via text, audio, or both, and receive a complete story with character portraits, environment artwork, and combined scene compositions.
 

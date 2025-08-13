@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 import time
 import os
+from rembg import remove
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -32,11 +33,24 @@ class StoryGeneratorService:
             "CompVis/stable-diffusion-v1-4"
         ]
         
-        # Get HF token from environment variable for security
+        # Hugging Face API config
         hf_token = os.getenv('HUGGINGFACE_TOKEN', 'abc')
         self.hf_headers = {
             "Authorization": f"Bearer {hf_token}"
         }
+
+        # Stability.ai API config
+        self.stability_api_key = os.getenv('STABILITY_API_KEY', '')
+        self.stability_headers = {
+            "Authorization": f"Bearer {self.stability_api_key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        self.stability_url_map = {
+            "portrait": "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
+            "landscape": "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
+        }
+
     
     def generate_complete_story_with_images(self, prompt, length='medium', genre='fantasy'):
         """Generate story, character description, background description, character image, and background image"""
@@ -306,14 +320,21 @@ class StoryGeneratorService:
             # Resize character based on position info
             target_size = int(min(char_img.size) * position_info['char_size_factor'])
             aspect_ratio = char_img.size[0] / char_img.size[1]
-            
+
             if aspect_ratio > 1:  # Wider than tall
                 new_size = (target_size, int(target_size / aspect_ratio))
             else:  # Taller than wide
                 new_size = (int(target_size * aspect_ratio), target_size)
-            
+
+            # First resize based on position info
             char_img_resized = char_img.resize(new_size, Image.Resampling.LANCZOS)
-            
+
+            # Additional shrink to 65%
+            scale_factor = 0.65
+            final_size = (int(char_img_resized.size[0] * scale_factor),
+                        int(char_img_resized.size[1] * scale_factor))
+            char_img_resized = char_img_resized.resize(final_size, Image.Resampling.LANCZOS)
+
             # Apply subtle background removal/softening
             # Convert to OpenCV format
             char_cv = cv2.cvtColor(np.array(char_img_resized.convert('RGB')), cv2.COLOR_RGB2BGR)
@@ -369,6 +390,12 @@ class StoryGeneratorService:
         Composite character onto background using proper positioning and blending
         """
         try:
+            # === Background removal step ===
+            try:
+                char_img = remove(char_img)  # Returns a PIL image with alpha channel
+            except Exception as e:
+                logger.warning(f"Background removal failed: {e}")
+
             # Create the final composition
             final_img = bg_img.copy().convert('RGBA')
             
@@ -378,9 +405,9 @@ class StoryGeneratorService:
             
             # Horizontal positioning
             if position_info['char_position'] == 'left':
-                x_offset = bg_width // 6
+                x_offset = bg_width // 9
             elif position_info['char_position'] == 'right':
-                x_offset = bg_width - char_width - (bg_width // 6)
+                x_offset = bg_width - char_width - (bg_width // 9)
             else:  # center
                 x_offset = (bg_width - char_width) // 2
             
@@ -449,7 +476,7 @@ class StoryGeneratorService:
             return combined_img
     
     def generate_complete_story(self, prompt, length='medium', genre='fantasy'):
-        """Generate story, character description, and background description in a single chain - IMPROVED VERSION"""
+        """Generate story, character description, and background description in a single chain """
         
         length_instructions = {
             'short': 'Write a complete short story of 200-300 words with clear beginning, middle, and end.',
@@ -631,8 +658,14 @@ class StoryGeneratorService:
             image_prompt = self.generate_character_image_prompt(character_description, visual_style, genre)
             
             # Add consistent character-specific enhancers
-            full_prompt = f"{image_prompt}, portrait, character design, centered composition, detailed face, professional lighting, high quality, masterpiece"
-            
+            full_prompt = (
+                f"{image_prompt}, portrait, character design, centered composition, "
+                f"detailed face, professional lighting, high quality, masterpiece, "
+                f"transparent background, isolated subject, no background, no scenery"
+                f"Give the character with NO BACKGROUND, and give the full body shot, head to toe, character standing."
+                )
+
+                        
             # Try multiple models until one works
             for model in self.hf_image_models:
                 try:
@@ -703,23 +736,45 @@ class StoryGeneratorService:
         }
         return style_mapping.get(genre, 'realistic art style, natural lighting')
     
+    def _call_stability_api(self, prompt, image_type="portrait"):
+        """Call Stability.ai API as fallback when HF models fail."""
+        try:
+            payload = {
+                "text_prompts": [{"text": prompt}],
+                "cfg_scale": 7,
+                "width": 1024,
+                "height": 1024,
+                "samples": 1
+            }
+            url = self.stability_url_map[image_type]
+            resp = requests.post(url, headers=self.stability_headers, json=payload, timeout=40)
+            if resp.status_code != 200:
+                logger.error(f"Stability API error {resp.status_code}: {resp.text}")
+                return None
+
+            data = resp.json()
+            img_b64 = data["artifacts"][0]["base64"]
+            return img_b64
+        except Exception as e:
+            logger.error(f"Error calling Stability API: {e}")
+            return None
+
     def _call_huggingface_api(self, model, prompt, max_retries=3, image_type="portrait"):
-        """Call Hugging Face Inference API with optimized parameters for different image types"""
+        """Call Hugging Face Inference API, fallback to Stability.ai if fails."""
         
         api_url = f"https://api-inference.huggingface.co/models/{model}"
         
-        # Optimize parameters based on image type - IMPROVED CONSISTENCY
         if image_type == "landscape":
-            width, height = 768, 512  # Wider for landscapes
-            guidance_scale = 7.0  # Slightly lower for environments
-        else:  # portrait
-            width, height = 512, 768  # Taller for characters
-            guidance_scale = 8.0  # Higher for character details
+            width, height = 768, 512
+            guidance_scale = 7.0
+        else:
+            width, height = 512, 768
+            guidance_scale = 8.0
         
         payload = {
             "inputs": prompt,
             "parameters": {
-                "num_inference_steps": 25,  # Slightly higher for better quality
+                "num_inference_steps": 25,
                 "guidance_scale": guidance_scale,
                 "width": width,
                 "height": height,
@@ -743,14 +798,14 @@ class StoryGeneratorService:
                     
                     return img_base64
                 
-                elif response.status_code == 503:  # Model loading
+                elif response.status_code == 503:
                     logger.info(f"Model {model} is loading, waiting...")
                     time.sleep(15)
                     continue
-                    
+                
                 else:
-                    logger.error(f"API call failed: {response.status_code} - {response.text}")
-                    return None
+                    logger.error(f"HF API call failed: {response.status_code} - {response.text}")
+                    break  # Exit retries and go to fallback
                     
             except requests.exceptions.Timeout:
                 logger.warning(f"Timeout on attempt {attempt + 1}")
@@ -758,10 +813,12 @@ class StoryGeneratorService:
                     time.sleep(8)
                 continue
             except Exception as e:
-                logger.error(f"API call error: {e}")
-                return None
+                logger.error(f"HF API call error: {e}")
+                break  # Exit retries and go to fallback
         
-        return None
+        # === Stability.ai fallback ===
+        logger.info("Falling back to Stability API...")
+        return self._call_stability_api(prompt, image_type=image_type)
     
     def _clean_image_prompt(self, prompt):
         """Clean and optimize character image prompt - IMPROVED VERSION"""

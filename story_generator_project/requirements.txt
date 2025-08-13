@@ -8,3 +8,5 @@ ollama==0.5.3
 pillow==11.3.0
 numpy==1.26.4
 opencv-python==4.12.0.88
+rembg==2.0.67
+onnxruntime==1.22.1

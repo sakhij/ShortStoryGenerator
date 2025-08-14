@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Auto-dismiss alerts after 5 seconds
     document.querySelectorAll('.alert-dismissible').forEach(alert => {
         setTimeout(() => {
             new bootstrap.Alert(alert).close();
@@ -33,7 +32,6 @@ function toggleInputFields() {
     const audioSection = document.getElementById('audio-upload-section');
     const generateBtn = document.getElementById('generate-btn-text');
 
-    // Show/hide sections based on input type
     if (inputType === 'text') {
         textSection.style.display = 'block';
         audioSection.style.display = 'none';
@@ -42,7 +40,7 @@ function toggleInputFields() {
         textSection.style.display = 'none';
         audioSection.style.display = 'block';
         generateBtn.textContent = 'Generate Story from Audio';
-    } else { // both
+    } else {
         textSection.style.display = 'block';
         audioSection.style.display = 'block';
         generateBtn.textContent = 'Generate Story from Text + Audio';
@@ -55,7 +53,6 @@ async function toggleRecording() {
 
     try {
         if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-            // Start recording
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder = new MediaRecorder(stream);
             recordedChunks = [];
@@ -75,7 +72,6 @@ async function toggleRecording() {
                 audioPlayer.src = audioUrl;
                 document.getElementById('audio-preview').style.display = 'block';
                 
-                // Store the blob for later use
                 audioPlayer.recordedBlob = audioBlob;
             };
 
@@ -118,15 +114,12 @@ function useRecording() {
     const audioInput = document.getElementById('audio-upload');
     
     if (audioPlayer.recordedBlob) {
-        // Create a File object from the blob
         const file = new File([audioPlayer.recordedBlob], 'recording.wav', { type: 'audio/wav' });
         
-        // Create a new FileList (this is a bit hacky but works)
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(file);
         audioInput.files = dataTransfer.files;
         
-        // Hide preview
         document.getElementById('audio-preview').style.display = 'none';
     }
 }

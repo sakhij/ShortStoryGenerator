@@ -1,4 +1,3 @@
-/* Modern Color Palette */
 :root {
     --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -488,7 +487,6 @@ html {
     scroll-behavior: smooth;
 }
 
-/* Selection styling */
 ::selection {
     background: rgba(102, 126, 234, 0.3);
     color: #2c3e50;

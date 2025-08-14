@@ -30,21 +30,18 @@ class StoryGeneratorService:
             logger.error(f"Failed to initialize Ollama: {e}")
             self.llm = None
         
-        # Hugging Face Inference API endpoints (free tier)
         self.hf_image_models = [
-            "black-forest-labs/FLUX.1-schnell",  # Fast and free
+            "black-forest-labs/FLUX.1-schnell",
             "stabilityai/stable-diffusion-xl-base-1.0",
             "runwayml/stable-diffusion-v1-5",
             "CompVis/stable-diffusion-v1-4"
         ]
         
-        # Hugging Face API config
         hf_token = os.getenv('HUGGINGFACE_TOKEN', 'abc')
         self.hf_headers = {
             "Authorization": f"Bearer {hf_token}"
         }
 
-        # Stability.ai API config
         self.stability_api_key = os.getenv('STABILITY_API_KEY', '')
         self.stability_headers = {
             "Authorization": f"Bearer {self.stability_api_key}",
@@ -56,7 +53,6 @@ class StoryGeneratorService:
             "landscape": "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
         }
 
-         # Initialize Whisper for audio transcription
         try:
             self.whisper_model = whisper.load_model("base") 
             logger.info("Whisper model loaded successfully")
@@ -79,23 +75,19 @@ class StoryGeneratorService:
             }
         
         try:
-            # Create temporary file to work with
             with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
                 # Read the uploaded file content
-                audio_file.seek(0)  # Make sure we're at the beginning
+                audio_file.seek(0)
                 file_content = audio_file.read()
                 
-                # Write to temporary file
                 temp_file.write(file_content)
                 temp_file_path = temp_file.name
             
             try:
-                # Convert to compatible format if needed using pydub
                 try:
                     audio = AudioSegment.from_file(temp_file_path)
-                    duration = len(audio) / 1000.0  # Convert to seconds
+                    duration = len(audio) / 1000.0
                     
-                    # Convert to wav format if not already
                     if not temp_file_path.endswith('.wav'):
                         wav_path = temp_file_path.replace(temp_file_path.split('.')[-1], 'wav')
                         audio.export(wav_path, format="wav")
@@ -121,7 +113,6 @@ class StoryGeneratorService:
                 }
                 
             finally:
-                # Clean up temporary files
                 try:
                     os.unlink(temp_file_path)
                     if 'wav_path' in locals() and wav_path != temp_file_path:
@@ -200,11 +191,9 @@ class StoryGeneratorService:
             transcription_result = None
             audio_duration = 0
             
-            # Add text prompt if provided
             if text_prompt and text_prompt.strip():
                 combined_prompt_parts.append(f"Text prompt: {text_prompt}")
             
-            # Add audio transcription if provided
             if audio_file:
                 logger.info("Transcribing audio for mixed input...")
                 transcription_result = self.transcribe_audio(audio_file)
@@ -253,22 +242,19 @@ class StoryGeneratorService:
                 'transcription_result': transcription_result
             }
 
-    # Add this helper method for audio file validation
     def validate_audio_file(self, audio_file):
         """Validate uploaded audio file"""
         allowed_formats = ['.mp3', '.wav', '.m4a', '.ogg', '.flac', '.aac']
-        max_size = 10 * 1024 * 1024  # 10MB
-        max_duration = 300  # 5 minutes in seconds
+        max_size = 10 * 1024 * 1024 
+        max_duration = 300
         
         try:
-            # Check file size
             if audio_file.size > max_size:
                 return {
                     'valid': False,
                     'error': f'File too large. Maximum size is {max_size / (1024*1024):.1f}MB'
                 }
             
-            # Check file extension
             file_ext = os.path.splitext(audio_file.name.lower())[1]
             if file_ext not in allowed_formats:
                 return {
@@ -276,7 +262,6 @@ class StoryGeneratorService:
                     'error': f'Unsupported format. Allowed formats: {", ".join(allowed_formats)}'
                 }
             
-            # Quick duration check using pydub
             try:
                 with tempfile.NamedTemporaryFile(delete=False) as temp_file:
                     audio_file.seek(0)
@@ -284,7 +269,7 @@ class StoryGeneratorService:
                     temp_file_path = temp_file.name
                 
                 audio = AudioSegment.from_file(temp_file_path)
-                duration = len(audio) / 1000.0  # Convert to seconds
+                duration = len(audio) / 1000.0
                 
                 os.unlink(temp_file_path)
                 
@@ -302,7 +287,6 @@ class StoryGeneratorService:
                 
             except Exception as e:
                 logger.warning(f"Could not validate audio duration: {e}")
-                # If we can't check duration, still allow the file
                 return {
                     'valid': True,
                     'duration': 0,
@@ -486,7 +470,7 @@ class StoryGeneratorService:
             
             if char_contrast > 0:
                 contrast_factor = bg_contrast / char_contrast
-                contrast_factor = max(0.7, min(1.5, contrast_factor))  # Limit adjustment
+                contrast_factor = max(0.7, min(1.5, contrast_factor))
                 enhancer = ImageEnhance.Contrast(char_img)
                 char_img = enhancer.enhance(contrast_factor)
             
@@ -505,23 +489,23 @@ class StoryGeneratorService:
             
             # Simple color temperature estimation
             if b_avg > r_avg:
-                return 6500 + (b_avg - r_avg) * 20  # Cooler
+                return 6500 + (b_avg - r_avg) * 20
             else:
-                return 3200 + (r_avg - b_avg) * 20  # Warmer
+                return 3200 + (r_avg - b_avg) * 20
         except:
-            return 5500  # Default daylight
+            return 5500
     
     def _adjust_color_temperature(self, img, temp_shift):
         """Adjust color temperature of an image"""
         try:
             img_array = np.array(img, dtype=np.float32)
             
-            if temp_shift > 0:  # Make cooler (more blue)
-                img_array[:, :, 2] *= (1 + temp_shift / 10000)  # Increase blue
-                img_array[:, :, 0] *= (1 - temp_shift / 20000)  # Decrease red
-            else:  # Make warmer (more red)
-                img_array[:, :, 0] *= (1 - temp_shift / 10000)  # Increase red
-                img_array[:, :, 2] *= (1 + temp_shift / 20000)  # Decrease blue
+            if temp_shift > 0:
+                img_array[:, :, 2] *= (1 + temp_shift / 10000)
+                img_array[:, :, 0] *= (1 - temp_shift / 20000)
+            else: 
+                img_array[:, :, 0] *= (1 - temp_shift / 10000)
+                img_array[:, :, 2] *= (1 + temp_shift / 20000)
             
             img_array = np.clip(img_array, 0, 255).astype(np.uint8)
             return Image.fromarray(img_array, mode=img.mode)
@@ -535,11 +519,11 @@ class StoryGeneratorService:
         Returns positioning and sizing information
         """
         position_info = {
-            'char_position': 'center',  # center, left, right
-            'char_size_factor': 0.6,    # Size relative to background
-            'char_vertical_pos': 0.7,   # 0.0 = top, 1.0 = bottom
-            'depth_layer': 'foreground', # foreground, midground, background
-            'interaction_type': 'standing' # standing, sitting, action, etc.
+            'char_position': 'center',
+            'char_size_factor': 0.6,
+            'char_vertical_pos': 0.7,
+            'depth_layer': 'foreground',
+            'interaction_type': 'standing'
         }
         
         try:
@@ -555,15 +539,15 @@ class StoryGeneratorService:
             
             # Determine size based on environment scale
             if any(word in bg_lower for word in ['vast', 'enormous', 'massive', 'grand', 'towering']):
-                position_info['char_size_factor'] = 0.4  # Smaller in grand environments
+                position_info['char_size_factor'] = 0.4
             elif any(word in bg_lower for word in ['intimate', 'small', 'cozy', 'narrow']):
-                position_info['char_size_factor'] = 0.8  # Larger in small spaces
+                position_info['char_size_factor'] = 0.8
             
             # Determine vertical position
             if any(word in char_lower for word in ['flying', 'floating', 'hovering']):
-                position_info['char_vertical_pos'] = 0.3  # Higher up
+                position_info['char_vertical_pos'] = 0.3
             elif any(word in char_lower for word in ['sitting', 'crouching', 'kneeling']):
-                position_info['char_vertical_pos'] = 0.9  # Lower down
+                position_info['char_vertical_pos'] = 0.9
             
             # Determine interaction type
             if any(word in char_lower for word in ['running', 'jumping', 'fighting', 'dancing']):
@@ -586,26 +570,24 @@ class StoryGeneratorService:
             target_size = int(min(char_img.size) * position_info['char_size_factor'])
             aspect_ratio = char_img.size[0] / char_img.size[1]
 
-            if aspect_ratio > 1:  # Wider than tall
+            if aspect_ratio > 1:
                 new_size = (target_size, int(target_size / aspect_ratio))
-            else:  # Taller than wide
+            else:
                 new_size = (int(target_size * aspect_ratio), target_size)
 
             # First resize based on position info
             char_img_resized = char_img.resize(new_size, Image.Resampling.LANCZOS)
 
-            # Additional shrink to 65%
-            scale_factor = 0.65
+            # Additional shrink to 55%
+            scale_factor = 0.55
             final_size = (int(char_img_resized.size[0] * scale_factor),
                         int(char_img_resized.size[1] * scale_factor))
             char_img_resized = char_img_resized.resize(final_size, Image.Resampling.LANCZOS)
 
             # Apply subtle background removal/softening
-            # Convert to OpenCV format
             char_cv = cv2.cvtColor(np.array(char_img_resized.convert('RGB')), cv2.COLOR_RGB2BGR)
             
             # Create a soft mask to isolate the character (simple approach)
-            # This could be enhanced with more sophisticated segmentation
             gray = cv2.cvtColor(char_cv, cv2.COLOR_BGR2GRAY)
             _, mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
             
@@ -625,22 +607,20 @@ class StoryGeneratorService:
             
         except Exception as e:
             logger.error(f"Error preparing character: {e}")
-            return char_img.resize((300, 400))  # Fallback resize
+            return char_img.resize((300, 400))
     
     def _prepare_background_for_composition(self, bg_img, position_info):
         """
         Prepare background image for character placement
         """
         try:
-            # Standard background size (you can adjust this)
+            # Standard background size
             target_size = (800, 600)
             bg_prepared = bg_img.resize(target_size, Image.Resampling.LANCZOS)
             
             # Apply subtle depth-of-field effect if character is in foreground
             if position_info['depth_layer'] == 'foreground':
-                # Convert to OpenCV for blur
                 bg_cv = cv2.cvtColor(np.array(bg_prepared), cv2.COLOR_RGB2BGR)
-                # Light background blur for depth
                 bg_cv = cv2.GaussianBlur(bg_cv, (3, 3), 0)
                 bg_prepared = Image.fromarray(cv2.cvtColor(bg_cv, cv2.COLOR_BGR2RGB))
             
@@ -655,9 +635,9 @@ class StoryGeneratorService:
         Composite character onto background using proper positioning and blending
         """
         try:
-            # === Background removal step ===
+            # Background removal
             try:
-                char_img = remove(char_img)  # Returns a PIL image with alpha channel
+                char_img = remove(char_img)
             except Exception as e:
                 logger.warning(f"Background removal failed: {e}")
 
@@ -682,17 +662,14 @@ class StoryGeneratorService:
             
             # Composite character onto background
             if char_img.mode == 'RGBA':
-                # Use alpha compositing
                 final_img.paste(char_img, (x_offset, y_offset), char_img)
             else:
-                # Simple paste without alpha
                 final_img.paste(char_img, (x_offset, y_offset))
             
             return final_img.convert('RGB')
             
         except Exception as e:
             logger.error(f"Error compositing final scene: {e}")
-            # Fallback: simple side-by-side composition
             total_width = bg_img.size[0] + char_img.size[0]
             max_height = max(bg_img.size[1], char_img.size[1])
             
@@ -727,8 +704,8 @@ class StoryGeneratorService:
             elif genre == 'sci-fi':
                 # Cool the colors slightly
                 img_array = np.array(combined_img, dtype=np.float32)
-                img_array[:, :, 2] *= 1.05  # Slight blue boost
-                img_array[:, :, 0] *= 0.98  # Slight red reduction
+                img_array[:, :, 2] *= 1.05
+                img_array[:, :, 0] *= 0.98
                 combined_img = Image.fromarray(np.clip(img_array, 0, 255).astype(np.uint8))
             
             # Apply subtle sharpening
@@ -749,7 +726,6 @@ class StoryGeneratorService:
             'long': 'Write a complete longer story of 500-750 words with rich detail and compelling narrative.'
         }
         
-        # More structured and separated template
         unified_template = PromptTemplate(
             input_variables=["prompt", "genre", "length_instruction"],
             template="""
@@ -805,7 +781,6 @@ class StoryGeneratorService:
                 "length_instruction": length_instructions[length]
             })
             
-            # Parse the response to extract individual sections
             return self._parse_response(complete_response)
             
         except Exception as e:
@@ -855,7 +830,6 @@ class StoryGeneratorService:
                 "genre": genre
             })
             
-            # Clean and optimize the prompt
             cleaned_prompt = self._clean_image_prompt(image_prompt.strip())
             return f"{cleaned_prompt}, {visual_style}"
             
@@ -907,7 +881,6 @@ class StoryGeneratorService:
                 "genre": genre
             })
             
-            # Clean and optimize the prompt
             cleaned_prompt = self._clean_background_image_prompt(image_prompt.strip())
             return f"{cleaned_prompt}, {visual_style}, no people, wide shot"
             
@@ -930,7 +903,6 @@ class StoryGeneratorService:
                 f"Give the character with PLAIN WHITE BACKGROUND, and give the full body shot, head to toe, character standing."
                 )
 
-                        
             # Try multiple models until one works
             for model in self.hf_image_models:
                 try:
@@ -1052,7 +1024,6 @@ class StoryGeneratorService:
                 response = requests.post(api_url, headers=self.hf_headers, json=payload, timeout=35)
                 
                 if response.status_code == 200:
-                    # Return base64 encoded image data
                     image_bytes = response.content
                     image = Image.open(BytesIO(image_bytes))
                     
@@ -1070,7 +1041,7 @@ class StoryGeneratorService:
                 
                 else:
                     logger.error(f"HF API call failed: {response.status_code} - {response.text}")
-                    break  # Exit retries and go to fallback
+                    break
                     
             except requests.exceptions.Timeout:
                 logger.warning(f"Timeout on attempt {attempt + 1}")
@@ -1079,15 +1050,14 @@ class StoryGeneratorService:
                 continue
             except Exception as e:
                 logger.error(f"HF API call error: {e}")
-                break  # Exit retries and go to fallback
+                break
         
-        # === Stability.ai fallback ===
+        # Stability.ai fallback
         logger.info("Falling back to Stability API...")
         return self._call_stability_api(prompt, image_type=image_type)
     
     def _clean_image_prompt(self, prompt):
-        """Clean and optimize character image prompt - IMPROVED VERSION"""
-        # Remove unwanted phrases more thoroughly
+        """Clean and optimize character image prompt"""
         unwanted_phrases = [
             "Visual Image Prompt:", "Image Prompt:", "Based on", "character description", 
             "This character", "The protagonist", "story", "personality", "motivation",
@@ -1108,8 +1078,7 @@ class StoryGeneratorService:
         return cleaned
     
     def _clean_background_image_prompt(self, prompt):
-        """Clean and optimize background image prompt - IMPROVED VERSION"""
-        # Remove unwanted phrases more thoroughly
+        """Clean and optimize background image prompt"""
         unwanted_phrases = [
             "Environment Image Prompt:", "Image Prompt:", "Based on", "background description", 
             "story context", "This environment", "The setting", "characters", "people",
@@ -1230,8 +1199,8 @@ class StoryGeneratorService:
         
         if len(paragraphs) >= 6:
             # Assume first 1/3 is story, middle 1/3 is character, last 1/3 is background
-            story_end = len(paragraphs) // 3
-            character_end = 2 * len(paragraphs) // 3
+            story_end = len(paragraphs) // 2
+            character_end = 2 * len(paragraphs) // 6
             
             return {
                 'story': '\n\n'.join(paragraphs[:story_end]).strip(),

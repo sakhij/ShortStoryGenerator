@@ -1,8 +1,6 @@
-# forms.py - Enhanced with audio upload
 from django import forms
 
 class StoryPromptForm(forms.Form):
-    # Existing text prompt field
     prompt = forms.CharField(
         widget=forms.Textarea(attrs={
             'class': 'form-control',
@@ -13,10 +11,10 @@ class StoryPromptForm(forms.Form):
         max_length=1000,
         label='Story Prompt',
         help_text='Describe the setting, character, or situation you want the story to be about.',
-        required=False  # Make optional when audio is provided
+        required=False
     )
     
-    # NEW: Audio upload field
+    # Audio upload field
     audio_file = forms.FileField(
         widget=forms.ClearableFileInput(attrs={
             'class': 'form-control',
@@ -28,7 +26,7 @@ class StoryPromptForm(forms.Form):
         required=False
     )
     
-    # NEW: Input type selection
+    # Input type selection
     input_type = forms.ChoiceField(
         choices=[
             ('text', 'Text Only'),
@@ -84,9 +82,9 @@ class StoryPromptForm(forms.Form):
         if input_type == 'both' and not (prompt or audio_file):
             raise forms.ValidationError("At least one input method (text or audio) is required.")
         
-        # File size validation (10MB limit)
+        # File size validation
         if audio_file:
-            if audio_file.size > 10 * 1024 * 1024:  # 10MB in bytes
+            if audio_file.size > 10 * 1024 * 1024:
                 raise forms.ValidationError("Audio file must be smaller than 10MB.")
         
         return cleaned_data

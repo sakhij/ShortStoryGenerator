@@ -59,7 +59,7 @@ def generate_story(request):
                 messages.info(request, 'Processing both text and audio inputs to create your story package... This may take a few moments.')
                 complete_story = story_service.generate_story_from_mixed_input(text_prompt, audio_file, length, genre)
                 
-            else:  # text only (default)
+            else:
                 messages.info(request, 'Creating your complete story package with images... This may take a few moments.')
                 complete_story = story_service.generate_complete_story_with_images(text_prompt, length, genre)
                 complete_story.update({
@@ -95,7 +95,6 @@ def generate_story(request):
             
             # Save to database with all data including audio information
             story_obj = StoryGeneration.objects.create(
-                # Text prompt (may be empty for audio-only)
                 prompt=text_prompt or "",
                 generated_story=complete_story['story'],
                 character_description=complete_story['character_description'],
@@ -117,7 +116,7 @@ def generate_story(request):
                 background_image_prompt=background_image.get('prompt'),
                 background_image_model=background_image.get('model_used'),
                 
-                # NEW: Combined scene data
+                # Combined scene data
                 combined_scene_data=combined_scene.get('image_data'),
                 combined_scene_prompt=combined_scene.get('prompt'),
                 combined_scene_model=combined_scene.get('model_used'),
@@ -127,10 +126,8 @@ def generate_story(request):
                 story_length=length
             )
             
-            # Create comprehensive success message
             success_parts = []
             
-            # Add input method info
             if complete_story.get('input_type') == 'audio':
                 success_parts.append('audio transcription')
             elif complete_story.get('input_type') == 'both':
@@ -232,7 +229,6 @@ def download_combined_scene(request, story_id):
             messages.error(request, 'No combined scene available for this story.')
             return redirect('story_detail', story_id=story_id)
         
-        # Decode the base64 image
         image_data = base64.b64decode(story_obj.combined_scene_data)
         
         # Create response with proper headers
@@ -257,7 +253,6 @@ def download_audio_file(request, story_id):
             messages.error(request, 'No audio file available for this story.')
             return redirect('story_detail', story_id=story_id)
         
-        # Get the file
         audio_file = story_obj.audio_file
         if not audio_file or not default_storage.exists(audio_file.name):
             messages.error(request, 'Audio file not found.')

@@ -1,4 +1,3 @@
-# models.py - Enhanced with audio support
 from django.db import models
 
 class StoryGeneration(models.Model):
@@ -26,18 +25,18 @@ class StoryGeneration(models.Model):
     ]
     
     # Original fields
-    prompt = models.TextField(max_length=1000, blank=True)  # Now optional
+    prompt = models.TextField(max_length=1000, blank=True)
     generated_story = models.TextField()
     character_description = models.TextField(blank=True)
     background_description = models.TextField(blank=True)
     
     # Audio-related fields
     audio_file = models.FileField(upload_to='audio_prompts/', blank=True, null=True)
-    audio_transcription = models.TextField(blank=True, null=True)  # Store transcribed text
-    audio_duration = models.FloatField(blank=True, null=True)  # Duration in seconds
+    audio_transcription = models.TextField(blank=True, null=True)
+    audio_duration = models.FloatField(blank=True, null=True)
     input_type = models.CharField(max_length=10, choices=INPUT_TYPE_CHOICES, default='text')
     
-    # Image fields (existing)
+    # Image fields
     character_image_data = models.TextField(blank=True, null=True)
     character_image_prompt = models.TextField(blank=True, null=True)
     character_image_model = models.CharField(max_length=100, blank=True, null=True)

@@ -2,6 +2,20 @@
 
 A Django-based web application that generates complete story packages with AI-powered text generation and visual artwork. Users can input story prompts via text, audio, or both, and receive a complete story with character portraits, environment artwork, and combined scene compositions.
 
+## Table of Contents
+1. [Features](#features)
+2. [Architecture Overview](#architecture-overview)
+3. [Installation & Setup](#installation-&-setup)
+4. [Configuration](#configuration)
+5. [Usage Guide](#usage-guide)
+6. [API Documentation](#api-documentation)
+7. [Troubleshooting](#troubleshooting)
+8. [Acknowledgments](#acknowledgments)
+9. [Support](#support)
+10. [Updates](#updates)
+
+---
+
 ## Features
 
 ### Multi-Modal Input

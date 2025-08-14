@@ -1,6 +1,8 @@
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from dotenv import load_dotenv
 import logging
 import re
@@ -15,10 +17,7 @@ import os
 from rembg import remove
 import whisper
 import tempfile
-import os
 from pydub import AudioSegment
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -750,7 +749,7 @@ class StoryGeneratorService:
             'long': 'Write a complete longer story of 500-750 words with rich detail and compelling narrative.'
         }
         
-        # IMPROVED: More structured and separated template
+        # More structured and separated template
         unified_template = PromptTemplate(
             input_variables=["prompt", "genre", "length_instruction"],
             template="""

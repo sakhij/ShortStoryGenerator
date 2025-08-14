@@ -1,5 +1,5 @@
 # Prompt Engineering Documentation
-## AI Story Generator - Complete Guide
+## Short Story Generator - Complete Guide
 
 ### Table of Contents
 1. [Overview](#overview)

@@ -8,11 +8,10 @@ A Django-based web application that generates complete story packages with AI-po
 3. [Installation & Setup](#installation-&-setup)
 4. [Configuration](#configuration)
 5. [Usage Guide](#usage-guide)
-6. [API Documentation](#api-documentation)
-7. [Troubleshooting](#troubleshooting)
-8. [Acknowledgments](#acknowledgments)
-9. [Support](#support)
-10. [Updates](#updates)
+6. [UI Screenshots](#ui-screenshots)
+7. [API Documentation](#api-documentation)
+8. [Troubleshooting](#troubleshooting)
+9. [Acknowledgments](#acknowledgments)
 
 ---
 
@@ -241,31 +240,50 @@ Database used is SQLite3 database stored locally
 
 ## Usage Guide
 
-### Basic Story Generation
-1. Navigate to home page
-2. Select "Text Only" input method
-3. Enter story prompt (e.g., "A detective discovers a portal in their office")
-4. Choose genre and length
-5. Click "Generate Story"
+### Getting Started
+1. Navigate to `http://localhost:8000` after starting the server
+2. Choose your preferred input method from the main interface
+3. Generate your story and view the complete package with text and visuals
 
-### Audio Story Generation
-1. Select "Audio Only" input method
-2. Either upload audio file or click "Record"
-3. For recording: speak your story idea clearly
-4. Choose genre and length
-5. Generate story
+### Input Methods
 
-### Mixed Input
-1. Select "Text + Audio" input method
-2. Provide both text prompt and audio
-3. System combines both inputs intelligently
-4. Choose genre and length
-5. Generate comprehensive story
+**Text Only**
+- Enter your story prompt directly in the text field
+- Best for detailed, specific story ideas
 
-### Story Management
-- **View Stories**: Click on any of the 5 recent stories to see full details
-- **Download Content**: Download audio files and scene images
-- **Delete Stories**: Remove unwanted stories and associated files
+**Audio Only**  
+- Upload an audio file or record directly in the browser
+- Speak your story idea clearly for best transcription results
+
+**Text + Audio**
+- Combine written prompts with voice descriptions
+- System intelligently merges both inputs for richer context
+
+### Story Options
+- **Genre**: Choose from multiple genres to guide the story style
+- **Length**: Select short, medium, or long story formats
+- **Generation**: Click "Generate Story" and wait for the complete package
+
+### Viewing Results
+- **Recent Stories**: Access your 5 most recent generations from the home page
+- **Full Package**: Each story includes text, character portraits, environment art, and combined scenes
+- **Downloads**: Save audio files and generated images to your device
+
+## UI Screenshots
+
+### Home Page - Input Interface
+![Main interface showing input method selection](images/Text_Prompt_UI.jpeg)
+
+### Audio Recording Interface
+![Audio recording controls with record/stop buttons, upload area](images/Audio_Input_UI.jpeg)
+
+### Complete Story Results
+*Screenshot placeholder: Generated story display with formatted text, character portrait, environment artwork, and combined scene composition*
+![Generated story display with combined scene](images/Story_Gen_UI.jpeg)
+![Generated character portrait and environment artwork](images/Char_Gen_UI.jpeg)
+
+### Recent Stories Gallery
+![Grid view of recent stories](images/Recent_Stories_UI.jpeg)
 
 ## API Documentation
 
@@ -362,28 +380,3 @@ python manage.py flush
 - **Hugging Face** for free image generation API
 - **Stability.ai** for high-quality image generation
 - **Django** framework for web application structure
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Search existing GitHub issues
-3. Create new issue with detailed description
-4. Include logs and system information
-5. Contact - [Email](mailto:sakhijain4@gmail.com)
-
-## Updates
-
-### Recent Changes
-- Added audio input support
-- Implemented scene composition
-- Enhanced prompt engineering
-- Improved error handling
-- Added file download features
-
-### Roadmap (Future, Potential Changes)
-- Video input support
-- Multiple language support
-- Real-time collaboration
-- Advanced scene editing
-- Mobile app development

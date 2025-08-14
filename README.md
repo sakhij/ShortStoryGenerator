@@ -1,4 +1,4 @@
-# AI Story Generator
+# Short Story Generator
 
 A Django-based web application that generates complete story packages with AI-powered text generation and visual artwork. Users can input story prompts via text, audio, or both, and receive a complete story with character portraits, environment artwork, and combined scene compositions.
 
@@ -53,7 +53,7 @@ ShortStoryGenerator
 1. **Input** → Text prompt validation
 2. **Story Generation** → Unified LLM call for story + descriptions
 3. **Image Generation** → Character and environment images
-4. **Scene Composition** → Combined final artwork
+4. **Scene Composition** → Combined final artwork using OpenCV and Pillow
 5. **Storage** → Database persistence with base64 images
 
 #### Audio Flow
@@ -61,7 +61,7 @@ ShortStoryGenerator
 2. **Transcription** → Whisper speech-to-text
 3. **Story Generation** → Same as text flow using transcription
 4. **Image Generation** → Character and environment images
-5. **Scene Composition** → Combined final artwork
+5. **Scene Composition** → Combined final artwork using OpenCV and Pillow
 6. **Storage** → Database + file system for audio
 
 #### Mixed Input Flow
@@ -88,6 +88,7 @@ User Input → Form Validation → Service Layer → AI Models → Database → 
 - Ollama (for local LLM)
 - FFmpeg (for audio processing)
 - Git
+- Hugging Face API key (Access Token)
 
 ### System Dependencies
 
@@ -112,7 +113,7 @@ brew install python ffmpeg git
 1. **Clone the Repository**
    ```bash
    git clone https://github.com/sakhij/ShortStoryGenerator.git
-   cd ai-story-generator
+   cd story_generator_project
    ```
 
 2. **Create Virtual Environment**
@@ -136,7 +137,8 @@ brew install python ffmpeg git
    # Linux/macOS
    curl -fsSL https://ollama.com/install.sh | sh
    
-   # Windows - Download from ollama.com
+   # Windows - Download from ollama.com or
+   winget install Ollama.Ollama 
    ```
 
 5. **Download Ollama Model**
@@ -149,7 +151,7 @@ brew install python ffmpeg git
    # Linux/macOS
     sudo apt install ffmpeg
    
-   # Windows
+   # Windows - Download from ffmpeg.org or
    winget install ffmpeg
 
 7. **Environment Configuration**
@@ -181,6 +183,7 @@ brew install python ffmpeg git
 ### AI Model Configuration
 
 #### Ollama Models
+- LLM model running locally for the story generation (text generation)
 - **Current**: `gemma:2b` (fast, good quality)
 - **Alternatives**: `llama2:7b`, `mistral:7b`
 
@@ -197,7 +200,7 @@ self.llm = OllamaLLM(model="gemma:2b")
 
 2. **Stability.ai (Free for 1st 25 credits and then paid)**
    - Stable Diffusion XL 1024
-   - Higher quality, faster generation
+   - Other options available on their website, https://stability.ai/
 
 ### File Storage Configuration
 
@@ -207,6 +210,8 @@ self.llm = OllamaLLM(model="gemma:2b")
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 ```
+#### Database
+Database used is SQLite3 database stored locally
 
 ### Audio Processing Configuration
 
@@ -215,7 +220,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 - Maximum size: 10MB
 - Maximum duration: 5 minutes
 
-#### Whisper Models
+#### Whisper Models (Free Models)
 - `base`: Good balance (default)
 - `small`: Faster, less accurate
 - `large`: Slower, more accurate
@@ -240,10 +245,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 1. Select "Text + Audio" input method
 2. Provide both text prompt and audio
 3. System combines both inputs intelligently
-4. Generate comprehensive story
+4. Choose genre and length
+5. Generate comprehensive story
 
 ### Story Management
-- **View Stories**: Click on recent stories to see full details
+- **View Stories**: Click on any of the 5 recent stories to see full details
 - **Download Content**: Download audio files and scene images
 - **Delete Stories**: Remove unwanted stories and associated files
 
@@ -324,7 +330,7 @@ python manage.py flush
 ### Performance Optimization
 
 #### For Better Speed
-- Use faster Ollama models (`gemma:2b`)
+- Use faster Ollama models (`Phi-2 or Phi-3`)
 - Implement Redis caching
 - Use CDN for static files
 - Optimize image sizes
@@ -361,7 +367,7 @@ For issues and questions:
 - Improved error handling
 - Added file download features
 
-### Roadmap
+### Roadmap (Future, Potential Changes)
 - Video input support
 - Multiple language support
 - Real-time collaboration
